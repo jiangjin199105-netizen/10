@@ -235,15 +235,15 @@ export default function App() {
 
   // Auto-refresh data
   useEffect(() => {
-    // Refresh based on setting, but faster if countdown is near zero
     if (autoRefreshInterval <= 0) return;
-    
-    const intervalTime = timeLeft < 10 ? 5000 : autoRefreshInterval * 1000;
+
+    const intervalTime = autoRefreshInterval * 1000;
     const refreshInterval = setInterval(() => {
       handleRefresh();
     }, intervalTime);
+
     return () => clearInterval(refreshInterval);
-  }, [handleRefresh, timeLeft, autoRefreshInterval]);
+  }, [handleRefresh, autoRefreshInterval]);
 
   // Countdown timer logic
   useEffect(() => {
@@ -277,7 +277,7 @@ export default function App() {
 
   // Recommendation Logic
   useEffect(() => {
-    if (draws.length < 50) return;
+    if (draws.length === 0) return;
 
     const latestDraw = draws[0];
     const nextPeriodStr = String(BigInt(latestDraw.period) + 1n);
@@ -318,7 +318,7 @@ export default function App() {
 
       // Check if we need to generate a NEW recommendation for nextPeriodStr
       const exists = newRecs.some(r => r.period === nextPeriodStr);
-      if (!exists && nextPeriodStr !== lastClearedPeriod) {
+      if (draws.length >= 50 && !exists && nextPeriodStr !== lastClearedPeriod) {
         // Perform Analysis
         // Logic:
         // 2nd (draws[1]) vs 47th (draws[47])
