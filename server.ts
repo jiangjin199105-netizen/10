@@ -31,8 +31,7 @@ async function startServer() {
       
       // 1. Primary Source: Try the specific API first
       const apiUrls = [
-        'https://api.api68.com/pks/getLotteryPksInfo.do?lotCode=10012',
-        'https://auluckylottery.com/api/results/lucky-ball-10'
+        'https://api.api68.com/pks/getLotteryPksInfo.do?lotCode=10012'
       ];
 
       for (const apiUrl of apiUrls) {

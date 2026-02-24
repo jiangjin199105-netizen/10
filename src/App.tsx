@@ -13,7 +13,8 @@ import {
   XCircle,
   Trash2,
   Volume2,
-  VolumeX
+  VolumeX,
+  Download
 } from 'lucide-react';
 import { format, differenceInSeconds } from 'date-fns';
 import { DrawRecord, Recommendation } from './types';
@@ -107,6 +108,8 @@ export default function App() {
   const [lastClearedPeriod, setLastClearedPeriod] = useState<string | null>(() => {
     return localStorage.getItem('lottery_last_cleared_period');
   });
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(15);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // Save recommendations to localStorage whenever they change
   useEffect(() => {
@@ -127,16 +130,19 @@ export default function App() {
 
   const handleClearRecommendations = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('确定要清空所有推荐记录吗？此操作不可恢复。')) {
-      // Record the current next period to prevent immediate regeneration
-      if (draws.length > 0) {
-        const latestDraw = draws[0];
-        const nextPeriodStr = String(BigInt(latestDraw.period) + 1n);
-        setLastClearedPeriod(nextPeriodStr);
-      }
-      setRecommendations([]);
-      localStorage.removeItem('lottery_recommendations');
+    setShowClearConfirm(true);
+  };
+
+  const confirmClearRecommendations = () => {
+    // Record the current next period to prevent immediate regeneration
+    if (draws.length > 0) {
+      const latestDraw = draws[0];
+      const nextPeriodStr = String(BigInt(latestDraw.period) + 1n);
+      setLastClearedPeriod(nextPeriodStr);
     }
+    setRecommendations([]);
+    localStorage.removeItem('lottery_recommendations');
+    setShowClearConfirm(false);
   };
 
   const handleManualEntry = () => {
@@ -229,13 +235,15 @@ export default function App() {
 
   // Auto-refresh data
   useEffect(() => {
-    // Refresh every 15 seconds normally, but every 5 seconds if countdown is near zero
-    const interval = timeLeft < 10 ? 5000 : 15000;
+    // Refresh based on setting, but faster if countdown is near zero
+    if (autoRefreshInterval <= 0) return;
+    
+    const intervalTime = timeLeft < 10 ? 5000 : autoRefreshInterval * 1000;
     const refreshInterval = setInterval(() => {
       handleRefresh();
-    }, interval);
+    }, intervalTime);
     return () => clearInterval(refreshInterval);
-  }, [handleRefresh, timeLeft]);
+  }, [handleRefresh, timeLeft, autoRefreshInterval]);
 
   // Countdown timer logic
   useEffect(() => {
@@ -425,6 +433,40 @@ export default function App() {
       return changed ? newRecs : prev;
     });
   }, [draws]);
+
+  const handleDownload = () => {
+    if (recommendations.length === 0) return;
+    
+    // CSV Header
+    const headers = ['预测期号', '推荐号码', '倍投策略', '本轮盈亏', '状态', '实际冠军', '创建时间'];
+    
+    // CSV Rows
+    const rows = recommendations.map(rec => [
+      rec.period,
+      rec.recommendedNumbers.join(' '),
+      `第${rec.bettingStep}轮`,
+      rec.profit !== undefined ? rec.profit : '-',
+      rec.status === 'won' ? '中奖' : rec.status === 'lost' ? '未中' : '等待开奖',
+      rec.actualChampion || '-',
+      format(rec.createTime, 'yyyy-MM-dd HH:mm:ss')
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+    
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `lottery_recommendations_${format(new Date(), 'yyyyMMddHHmmss')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const totalProfit = recommendations.reduce((sum, rec) => sum + (rec.profit || 0), 0);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -716,13 +758,28 @@ export default function App() {
                 <div className="flex items-center gap-4">
                   <h2 className="text-2xl font-serif font-bold italic">推荐记录</h2>
                   {recommendations.length > 0 && (
-                    <button 
-                      onClick={handleClearRecommendations}
-                      className="flex items-center gap-1 text-xs text-red-600 hover:bg-red-50 px-2 py-1 rounded transition-colors"
-                    >
-                      <Trash2 size={14} />
-                      清空记录
-                    </button>
+                    <>
+                      <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-lg border border-gray-200">
+                        <span className="text-xs text-gray-500">总盈亏:</span>
+                        <span className={`text-sm font-bold font-mono ${totalProfit > 0 ? 'text-emerald-600' : totalProfit < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                          {totalProfit > 0 ? '+' : ''}{totalProfit}
+                        </span>
+                      </div>
+                      <button 
+                        onClick={handleDownload}
+                        className="flex items-center gap-1 text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
+                      >
+                        <Download size={14} />
+                        下载记录
+                      </button>
+                      <button 
+                        onClick={handleClearRecommendations}
+                        className="flex items-center gap-1 text-xs text-red-600 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                      >
+                        <Trash2 size={14} />
+                        清空记录
+                      </button>
+                    </>
                   )}
                 </div>
                 <button onClick={() => setShowRecommendations(false)}>
@@ -800,6 +857,45 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* Clear Confirmation Modal */}
+      <AnimatePresence>
+        {showClearConfirm && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-[#141414]/80 backdrop-blur-sm p-4"
+            onClick={() => setShowClearConfirm(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-[#E4E3E0] border border-[#141414] w-full max-w-sm p-6 shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <h3 className="text-xl font-bold mb-4">确认清空?</h3>
+              <p className="text-sm text-gray-600 mb-6">
+                确定要清空所有推荐记录吗？此操作不可恢复。
+              </p>
+              <div className="flex justify-end gap-3">
+                <button 
+                  onClick={() => setShowClearConfirm(false)}
+                  className="px-4 py-2 text-sm border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                >
+                  取消
+                </button>
+                <button 
+                  onClick={confirmClearRecommendations}
+                  className="px-4 py-2 text-sm bg-red-600 text-white hover:bg-red-700 transition-colors"
+                >
+                  确认清空
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Settings Modal */}
       <AnimatePresence>
         {showSettings && (
@@ -827,6 +923,21 @@ export default function App() {
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
                         placeholder="https://example.com/lottery/results"
+                        className="w-full bg-white border border-[#141414] pl-10 pr-4 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[#141414]"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono uppercase mb-2 opacity-60">自动更新间隔 (秒)</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <RefreshCw className="absolute left-3 top-1/2 -translate-y-1/2 opacity-30" size={14} />
+                      <input 
+                        type="number" 
+                        value={autoRefreshInterval}
+                        onChange={(e) => setAutoRefreshInterval(Math.max(5, parseInt(e.target.value) || 15))}
                         className="w-full bg-white border border-[#141414] pl-10 pr-4 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[#141414]"
                       />
                     </div>
