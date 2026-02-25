@@ -14,10 +14,11 @@ import {
   Trash2,
   Volume2,
   VolumeX,
-  Download
+  Download,
+  Bot
 } from 'lucide-react';
 import { format, differenceInSeconds } from 'date-fns';
-import { DrawRecord, Recommendation } from './types';
+import { DrawRecord, Recommendation, AppSettings } from './types';
 
 // Mock data generator for demo purposes
 const generateMockDraws = (): DrawRecord[] => {
@@ -111,6 +112,160 @@ export default function App() {
   const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(15);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
+  // App Settings
+  const defaultMacroConfig = {
+    numCoords: {
+      1: "100,200", 2: "150,200", 3: "200,200", 4: "250,200", 5: "300,200",
+      6: "100,250", 7: "150,250", 8: "200,250", 9: "250,250", 10: "300,250"
+    },
+    keypadCoords: {
+      1: "50,400", 2: "150,400", 3: "250,400",
+      4: "50,430", 5: "150,430", 6: "250,430",
+      7: "50,460", 8: "150,460", 9: "250,460",
+      0: "150,500"
+    },
+    keypadClear: "300,400",
+    keypadConfirm: "300,500",
+    amountInput: "200,300",
+    submitBet: "350,600",
+    betSteps: [10, 30, 70, 150]
+  };
+
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    const saved = localStorage.getItem('app_settings');
+    const defaults: AppSettings = { macroHelper: false, macroConfig: defaultMacroConfig };
+    const savedSettings = saved ? JSON.parse(saved) : {};
+    
+    // Ensure macroConfig exists and has all required fields if partially saved
+    if (!savedSettings.macroConfig) {
+      savedSettings.macroConfig = defaultMacroConfig;
+    } else {
+      savedSettings.macroConfig = { ...defaultMacroConfig, ...savedSettings.macroConfig };
+    }
+    
+    return { ...defaults, ...savedSettings };
+  });
+  const [macroInfo, setMacroInfo] = useState<{ period: string, numbers: number[] } | null>(null);
+  
+  // Console State
+  const [showConsole, setShowConsole] = useState(false);
+  const [macroLogs, setMacroLogs] = useState<{ time: string; status: string; step: string; record: string }[]>([]);
+
+  useEffect(() => {
+    if (window.location.hash === '#console') {
+      setShowConsole(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (showConsole) {
+      const fetchLogs = async () => {
+        try {
+          const res = await fetch('/api/logs');
+          if (res.ok) {
+            const data = await res.json();
+            setMacroLogs(data);
+          }
+        } catch (err) {
+          console.error("Failed to fetch logs", err);
+        }
+      };
+      fetchLogs();
+      interval = setInterval(fetchLogs, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [showConsole]);
+
+  const autoElfScriptContent = `
+Rem =========================================================================================
+Rem == 按键精灵 (VBScript) - 全自动投注脚本 v16.0 (网页控制台版)
+Rem =========================================================================================
+Rem 说明：
+Rem 1. 本版本无需在按键精灵中配置任何坐标！
+Rem 2. 请在网页端的【控制台】中填写所有坐标。
+Rem 3. 网页端会自动计算点击流程并发送给本脚本执行。
+Rem 4. 脚本运行状态和日志将实时同步到网页控制台。
+
+Dim Hwnd
+Hwnd = 0
+
+' 启动时自动打开控制台网页
+RunApp "http://127.0.0.1:3000/#console"
+
+Function SendLog(sStatus, sStep, sRecord)
+    Dim Http, url
+    Set Http = CreateObject("MSXML2.XMLHTTP")
+    ' 简单的 URL 编码 (替换空格)
+    sStatus = Replace(sStatus, " ", "%20")
+    sStep = Replace(sStep, " ", "%20")
+    sRecord = Replace(sRecord, " ", "%20")
+    url = "http://127.0.0.1:3000/api/log?status=" & sStatus & "&step=" & sStep & "&record=" & sRecord
+    On Error Resume Next
+    Http.open "GET", url, False
+    Http.Send
+    On Error GoTo 0
+End Function
+
+SendLog "等待操作", "请锁定窗口", "脚本已启动"
+MessageBox "【第一步】请将鼠标移动到你要操作的投注软件窗口内，然后按【回车键】(Enter) 锁定该窗口。"
+Do
+    Dim key
+    key = WaitKey()
+    If key = 13 Then
+        Hwnd = Plugin.Window.MousePoint()
+        SendLog "正常运行", "等待网页端新指令...", "已成功锁定窗口句柄: " & Hwnd
+        Exit Do
+    End If
+Loop
+
+Dim HttpTask, Ret, commands, cmd, parts, i
+Set HttpTask = CreateObject("MSXML2.XMLHTTP")
+
+Do
+    On Error Resume Next
+    Err.Clear
+    HttpTask.open "GET", "http://127.0.0.1:3000/api/task", False
+    HttpTask.Send
+    If Err.Number = 0 Then
+        Ret = HttpTask.responseText
+        If Ret <> "NO_TASK" And Ret <> "" Then
+            SendLog "执行下注", "正在执行任务", "收到新任务，开始执行"
+            Call Plugin.Window.Restore(Hwnd)
+            Delay 500
+
+            commands = Split(Ret, "|")
+            For i = 0 To UBound(commands)
+                cmd = commands(i)
+                parts = Split(cmd, ",")
+                If parts(0) = "CLICK" Then
+                    Call Plugin.Bkgnd.LeftClick(Hwnd, CInt(parts(1)), CInt(parts(2)))
+                ElseIf parts(0) = "DELAY" Then
+                    Delay CInt(parts(1))
+                ElseIf parts(0) = "LOG" Then
+                    SendLog "执行下注", parts(1), ""
+                End If
+            Next
+
+            SendLog "正常运行", "等待下一期...", "任务执行完毕"
+        End If
+    End If
+    Delay 2000
+Loop
+`;
+
+  const handleDownloadScript = () => {
+    const blob = new Blob([autoElfScriptContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'AutoBetScript.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // Save recommendations to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('lottery_recommendations', JSON.stringify(recommendations));
@@ -127,6 +282,11 @@ export default function App() {
       localStorage.setItem('lottery_last_cleared_period', lastClearedPeriod);
     }
   }, [lastClearedPeriod]);
+
+  // Save app settings
+  useEffect(() => {
+    localStorage.setItem('app_settings', JSON.stringify(settings));
+  }, [settings]);
 
   const handleClearRecommendations = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -420,7 +580,73 @@ export default function App() {
             });
             changed = true;
             
-            // Voice notification
+            // Voice notification & Macro Helper update
+            if (settings.macroHelper) {
+              // Post the new recommendation to the server API
+              fetch('/api/update-recommendation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ period: nextPeriodStr, numbers: recommendedNumbers, step: bettingStep })
+              }).catch(err => console.error("Failed to update recommendation API:", err));
+
+              // Generate the task string for the universal executor
+              if (settings.macroConfig) {
+                const config = settings.macroConfig;
+                const commands: string[] = [];
+                
+                // 1. Click numbers
+                commands.push(`LOG,正在选中推荐号码...`);
+                recommendedNumbers.forEach(num => {
+                  const coord = config.numCoords[num];
+                  if (coord) {
+                    commands.push(`CLICK,${coord}`);
+                    commands.push(`DELAY,150`);
+                  }
+                });
+                
+                // 2. Click amount input
+                commands.push(`LOG,正在唤出小键盘...`);
+                commands.push(`CLICK,${config.amountInput}`);
+                commands.push(`DELAY,600`);
+                
+                // 3. Click clear
+                commands.push(`LOG,正在清零倍数...`);
+                commands.push(`CLICK,${config.keypadClear}`);
+                commands.push(`DELAY,300`);
+                
+                // 4. Click digits
+                const amount = config.betSteps[bettingStep - 1] || config.betSteps[0];
+                commands.push(`LOG,正在输入倍数: ${amount}`);
+                const amountStr = String(amount);
+                for (let i = 0; i < amountStr.length; i++) {
+                  const digit = parseInt(amountStr[i]);
+                  const coord = config.keypadCoords[digit];
+                  if (coord) {
+                    commands.push(`CLICK,${coord}`);
+                    commands.push(`DELAY,200`);
+                  }
+                }
+                
+                // 5. Click confirm
+                commands.push(`LOG,确认倍数...`);
+                commands.push(`CLICK,${config.keypadConfirm}`);
+                commands.push(`DELAY,500`);
+                
+                // 6. Click submit
+                commands.push(`LOG,点击立即投注...`);
+                commands.push(`CLICK,${config.submitBet}`);
+                commands.push(`DELAY,500`);
+                
+                const taskString = commands.join('|');
+                
+                fetch('/api/update-task', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ taskString })
+                }).catch(err => console.error("Failed to update task API:", err));
+              }
+            }
+
             if (enableVoice && 'speechSynthesis' in window) {
               const utterance = new SpeechSynthesisUtterance(`第${nextPeriodStr.slice(-3)}期推荐已生成，倍投策略第${bettingStep}轮`);
               utterance.lang = 'zh-CN';
@@ -559,6 +785,7 @@ export default function App() {
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
             )}
           </button>
+
           <button 
             onClick={() => setShowSettings(!showSettings)}
             className="p-2 border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-colors"
@@ -908,11 +1135,13 @@ export default function App() {
             <motion.div 
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              className="bg-[#E4E3E0] border border-[#141414] w-full max-w-md p-8 shadow-2xl"
+              className="bg-[#E4E3E0] border border-[#141414] w-full max-w-md shadow-2xl flex flex-col max-h-[90vh]"
             >
-              <h2 className="text-2xl font-serif font-bold italic mb-6">软件配置</h2>
+              <div className="p-8 border-b border-[#141414]/10">
+                <h2 className="text-2xl font-serif font-bold italic">软件配置</h2>
+              </div>
               
-              <div className="space-y-6">
+              <div className="p-8 space-y-6 overflow-y-auto">
                 <div>
                   <label className="block text-[10px] font-mono uppercase mb-2 opacity-60">数据源网址 (网页抓取)</label>
                   <div className="flex gap-2">
@@ -944,20 +1173,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-mono uppercase mb-2 opacity-60">倒计时时长 (分钟)</label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 opacity-30" size={14} />
-                      <input 
-                        type="number" 
-                        value={countdownDuration}
-                        onChange={(e) => setCountdownDuration(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-full bg-white border border-[#141414] pl-10 pr-4 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[#141414]"
-                      />
-                    </div>
-                  </div>
-                </div>
+
 
                 <div>
                   <label className="block text-[10px] font-mono uppercase mb-2 opacity-60">语音提示</label>
@@ -986,7 +1202,33 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="pt-4 border-t border-[#141414]/10 flex justify-end gap-4">
+                {/* Auto-betting Settings */}
+                <div className="pt-4 border-t border-[#141414]/10">
+                  <h3 className="font-serif font-bold italic text-base mb-3">按键精灵助手</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 text-xs font-mono">
+                        <input 
+                          type="checkbox" 
+                          checked={settings.macroHelper}
+                          onChange={e => setSettings(s => ({ ...s, macroHelper: e.target.checked }))}
+                          className="w-4 h-4 accent-[#141414]"
+                        />
+                        启用按键精灵自动下注
+                      </label>
+                      <button onClick={handleDownloadScript} className="text-xs font-mono uppercase bg-white border border-[#141414] px-3 py-1 hover:bg-gray-100 transition-colors flex items-center gap-2">
+                        <Download size={12} />
+                        下载新版脚本
+                      </button>
+                    </div>
+                    <p className="text-[11px] font-mono text-gray-500 pt-2">
+                      启用后，网页端将通过API向按键精灵发送开奖指令。请在【脚本控制台】中配置您的屏幕坐标。
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-[#141414]/10 mt-auto bg-white/50 flex justify-end gap-4">
                   <button 
                     onClick={() => setShowSettings(false)}
                     className="text-xs font-mono uppercase hover:underline"
@@ -999,6 +1241,211 @@ export default function App() {
                   >
                     保存更改
                   </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Macro Helper UI */}
+      <AnimatePresence>
+        {macroInfo && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-4 right-4 bg-black text-white p-6 rounded-lg shadow-2xl z-[100] border-4 border-yellow-400"
+          >
+            <div className="text-center">
+              <h3 className="text-lg font-bold text-yellow-400 mb-2">按键精灵助手</h3>
+              <p className="text-xs uppercase text-gray-400 mb-4">期号: <span className="font-bold text-yellow-400 text-sm">{macroInfo.period}</span></p>
+              <div className="mb-4">
+                <p className="text-xs uppercase text-gray-400">推荐号码</p>
+                <div className="flex justify-center gap-2 mt-2">
+                  {macroInfo.numbers.map(n => (
+                    <span key={n} className="bg-white text-black w-12 h-12 flex items-center justify-center text-2xl font-bold rounded">{n}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Macro Console Modal */}
+      <AnimatePresence>
+        {showConsole && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#141414]/90 backdrop-blur-sm p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-[#1e1e1e] border border-gray-700 w-full max-w-5xl shadow-2xl flex flex-col h-[85vh] text-gray-300"
+            >
+              <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-[#141414]">
+                <div className="flex items-center gap-3">
+                  <Bot className="text-indigo-400" size={24} />
+                  <h2 className="text-xl font-mono font-bold text-white">按键精灵 - 网页控制台</h2>
+                  {macroLogs.length > 0 && (
+                    <span className="ml-4 px-2 py-1 bg-green-900/50 text-green-400 text-[10px] font-mono rounded border border-green-700">
+                      {macroLogs[0].status}
+                    </span>
+                  )}
+                </div>
+                <button 
+                  onClick={() => {
+                    setShowConsole(false);
+                    window.location.hash = '';
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <XCircle size={24} />
+                </button>
+              </div>
+              
+              <div className="flex flex-1 overflow-hidden">
+                {/* Left Panel: Logs & Status */}
+                <div className="w-1/2 border-r border-gray-700 flex flex-col bg-[#1a1a1a]">
+                  <div className="p-3 border-b border-gray-700 bg-[#222] font-mono text-xs text-gray-400 uppercase tracking-wider">
+                    实时运行日志
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-xs">
+                    {macroLogs.length === 0 ? (
+                      <div className="text-gray-600 italic">等待脚本连接...</div>
+                    ) : (
+                      macroLogs.map((log, idx) => (
+                        <div key={idx} className="flex gap-3 border-b border-gray-800 pb-2">
+                          <span className="text-gray-500 shrink-0">[{log.time}]</span>
+                          <div className="flex flex-col">
+                            <span className={log.status.includes('正常') ? 'text-green-400' : 'text-indigo-400'}>
+                              {log.status} - {log.step}
+                            </span>
+                            {log.record && <span className="text-gray-400 mt-1">{log.record}</span>}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Panel: Configuration */}
+                <div className="w-1/2 flex flex-col bg-[#1e1e1e]">
+                  <div className="p-3 border-b border-gray-700 bg-[#222] font-mono text-xs text-gray-400 uppercase tracking-wider flex justify-between items-center">
+                    <span>坐标与倍数配置 (实时生效)</span>
+                    <button onClick={handleDownloadScript} className="text-[10px] bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-500 transition-colors flex items-center gap-1">
+                      <Download size={10} /> 下载控制台版脚本
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    {settings.macroConfig && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-mono uppercase mb-3 text-gray-400">选号坐标 (1-10)</label>
+                          <div className="grid grid-cols-5 gap-3">
+                            {[1,2,3,4,5,6,7,8,9,10].map(num => (
+                              <div key={`num-${num}`}>
+                                <span className="text-[10px] text-gray-500 mb-1 block">号码 {num}</span>
+                                <input 
+                                  type="text" 
+                                  value={settings.macroConfig!.numCoords[num] || ''}
+                                  onChange={e => setSettings(s => ({
+                                    ...s, 
+                                    macroConfig: { ...s.macroConfig!, numCoords: { ...s.macroConfig!.numCoords, [num]: e.target.value } }
+                                  }))}
+                                  className="w-full bg-[#141414] border border-gray-700 px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                                  placeholder="x,y"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-mono uppercase mb-3 text-gray-400">小键盘坐标 (0-9)</label>
+                          <div className="grid grid-cols-5 gap-3">
+                            {[1,2,3,4,5,6,7,8,9,0].map(num => (
+                              <div key={`keypad-${num}`}>
+                                <span className="text-[10px] text-gray-500 mb-1 block">按键 {num}</span>
+                                <input 
+                                  type="text" 
+                                  value={settings.macroConfig!.keypadCoords[num] || ''}
+                                  onChange={e => setSettings(s => ({
+                                    ...s, 
+                                    macroConfig: { ...s.macroConfig!, keypadCoords: { ...s.macroConfig!.keypadCoords, [num]: e.target.value } }
+                                  }))}
+                                  className="w-full bg-[#141414] border border-gray-700 px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                                  placeholder="x,y"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[10px] font-mono uppercase mb-1 text-gray-500">倍数输入框坐标</label>
+                            <input 
+                              type="text" 
+                              value={settings.macroConfig!.amountInput}
+                              onChange={e => setSettings(s => ({ ...s, macroConfig: { ...s.macroConfig!, amountInput: e.target.value } }))}
+                              className="w-full bg-[#141414] border border-gray-700 px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-mono uppercase mb-1 text-gray-500">立即投注坐标</label>
+                            <input 
+                              type="text" 
+                              value={settings.macroConfig!.submitBet}
+                              onChange={e => setSettings(s => ({ ...s, macroConfig: { ...s.macroConfig!, submitBet: e.target.value } }))}
+                              className="w-full bg-[#141414] border border-gray-700 px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-mono uppercase mb-1 text-gray-500">小键盘清零坐标</label>
+                            <input 
+                              type="text" 
+                              value={settings.macroConfig!.keypadClear}
+                              onChange={e => setSettings(s => ({ ...s, macroConfig: { ...s.macroConfig!, keypadClear: e.target.value } }))}
+                              className="w-full bg-[#141414] border border-gray-700 px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-mono uppercase mb-1 text-gray-500">小键盘确认坐标</label>
+                            <input 
+                              type="text" 
+                              value={settings.macroConfig!.keypadConfirm}
+                              onChange={e => setSettings(s => ({ ...s, macroConfig: { ...s.macroConfig!, keypadConfirm: e.target.value } }))}
+                              className="w-full bg-[#141414] border border-gray-700 px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-mono uppercase mb-3 text-gray-400">策略倍数 (第1-4轮)</label>
+                          <div className="grid grid-cols-4 gap-3">
+                            {[0, 1, 2, 3].map(idx => (
+                              <div key={`step-${idx}`}>
+                                <span className="text-[10px] text-gray-500 mb-1 block">第 {idx + 1} 轮</span>
+                                <input 
+                                  type="number" 
+                                  value={settings.macroConfig!.betSteps[idx] || 0}
+                                  onChange={e => {
+                                    const newSteps = [...settings.macroConfig!.betSteps];
+                                    newSteps[idx] = parseInt(e.target.value) || 0;
+                                    setSettings(s => ({ ...s, macroConfig: { ...s.macroConfig!, betSteps: newSteps } }));
+                                  }}
+                                  className="w-full bg-[#141414] border border-gray-700 px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </motion.div>

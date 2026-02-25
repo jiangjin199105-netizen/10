@@ -3,11 +3,78 @@ import { createServer as createViteServer } from "vite";
 import axios from "axios";
 import * as cheerio from "cheerio";
 
+// Global variable to hold the latest recommendation for the script
+let latestRecommendation: { period: string; numbers: number[]; step: number } | null = null;
+let latestTaskString: string | null = null;
+let macroLogs: { time: string; status: string; step: string; record: string }[] = [];
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
+
+  // API for the script to send logs
+  app.get("/api/log", (req, res) => {
+    const { status, step, record } = req.query;
+    macroLogs.unshift({
+      time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+      status: String(status || ""),
+      step: String(step || ""),
+      record: String(record || "")
+    });
+    if (macroLogs.length > 100) macroLogs.pop(); // Keep last 100 logs
+    res.sendStatus(200);
+  });
+
+  // API for the frontend to fetch logs
+  app.get("/api/logs", (req, res) => {
+    res.json(macroLogs);
+  });
+
+  // API for the script to get the latest recommendation (legacy, keeping for compatibility if needed)
+  app.get("/api/recommendation", (req, res) => {
+    if (latestRecommendation) {
+      res.json(latestRecommendation);
+    } else {
+      res.status(404).json({ error: "No recommendation available yet" });
+    }
+  });
+
+  // API for the script to get the exact click task string
+  app.get("/api/task", (req, res) => {
+    if (latestTaskString) {
+      res.send(latestTaskString);
+      // Clear it so it doesn't execute twice
+      latestTaskString = null;
+    } else {
+      res.send("NO_TASK");
+    }
+  });
+
+  // API for the client to post the exact click task string
+  app.post("/api/update-task", (req, res) => {
+    const { taskString } = req.body;
+    if (taskString) {
+      latestTaskString = taskString;
+      console.log("Received new macro task string");
+      res.status(200).json({ message: "Task updated" });
+    } else {
+      res.status(400).json({ error: "Invalid task string" });
+    }
+  });
+
+  // API for the client to post the latest recommendation
+  app.post("/api/update-recommendation", (req, res) => {
+    const { period, numbers, step } = req.body;
+    if (period && Array.isArray(numbers) && step) {
+      latestRecommendation = { period, numbers, step };
+      console.log("Updated recommendation via API:", latestRecommendation);
+      res.status(200).json({ message: "Recommendation updated" });
+    } else {
+      res.status(400).json({ error: "Invalid data format" });
+    }
+  });
 
   // API to fetch draw records from a URL
   app.post("/api/fetch-draws", async (req, res) => {
@@ -29,69 +96,8 @@ async function startServer() {
         }
       };
       
-      // 1. Primary Source: Try the specific API first
-      const apiUrls = [
-        'https://api.api68.com/pks/getLotteryPksInfo.do?lotCode=10012',
-        'https://api.api86.com/pks/getLotteryPksInfo.do?lotCode=10012'
-      ];
-
-      for (const apiUrl of apiUrls) {
-        try {
-          const apiRes = await axios.get(apiUrl, { 
-            timeout: 5000,
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
-          });
-          
-          if (apiUrl.includes('api68.com') || apiUrl.includes('api86.com')) {
-            const data = apiRes.data?.result?.data;
-            if (Array.isArray(data)) {
-              data.forEach((r: any) => {
-                const period = r.preDrawIssue;
-                const resText = r.preDrawCode;
-                if (period && resText) {
-                  const numbers = String(resText).split(/[\s,]+/).filter(n => n.length > 0);
-                  const sum = numbers.slice(0, 3).reduce((a, b) => a + (parseInt(b) || 0), 0);
-                  addDraw({
-                    period: String(period),
-                    result: numbers.join(', '),
-                    sum,
-                    bigSmall: sum >= 14 ? '大' : '小',
-                    oddEven: sum % 2 === 0 ? '双' : '单'
-                  });
-                }
-              });
-              // Extract next draw time if available
-              if (data[0]?.drawTime) {
-                nextDrawTime = data[0].drawTime;
-              }
-            }
-          } else if (apiRes.data && Array.isArray(apiRes.data)) {
-            apiRes.data.forEach((r: any) => {
-              const period = r.period || r.draw_number || r.id;
-              const resText = r.result || r.numbers;
-              if (period && resText) {
-                const numbers = String(resText).split(/[\s,]+/).filter(n => n.length > 0);
-                const sum = numbers.reduce((a, b) => a + (parseInt(b) || 0), 0);
-                addDraw({
-                  period: String(period),
-                  result: numbers.join(', '),
-                  sum,
-                  bigSmall: sum >= 14 ? '大' : '小',
-                  oddEven: sum % 2 === 0 ? '双' : '单'
-                });
-              }
-            });
-          }
-          if (drawsMap.size > 0) break;
-        } catch (e) {
-          console.error(`API fetch failed for ${apiUrl}:`, e.message);
-        }
-      }
-
-      // 2. Secondary Source: Scraping if API failed
-      if (drawsMap.size === 0 || !nextDrawTime) {
+      // Scraping is now the primary source
+      if (true) { // Keeping structure for clarity
         try {
           const response = await axios.get(url, {
             headers: {
