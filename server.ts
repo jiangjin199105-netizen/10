@@ -2,11 +2,37 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import axios from "axios";
 import * as cheerio from "cheerio";
+import https from "https";
 
 // Global variable to hold the latest recommendation for the script
 let latestRecommendation: { period: string; numbers: number[]; step: number } | null = null;
-let latestTaskString: string | null = null;
-let macroLogs: { time: string; status: string; step: string; record: string }[] = [];
+
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: false,
+  keepAlive: true,
+});
+
+async function fetchWithRetry(url: string, retries = 3): Promise<any> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await axios.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Connection': 'keep-alive',
+          'Cache-Control': 'no-cache'
+        },
+        timeout: 15000,
+        httpsAgent
+      });
+    } catch (error: any) {
+      if (i === retries - 1) throw error;
+      console.log(`Fetch failed, retrying (${i + 1}/${retries})...`, error.message);
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+    }
+  }
+}
 
 async function startServer() {
   const app = express();
@@ -14,53 +40,12 @@ async function startServer() {
 
   app.use(express.json());
 
-  // API for the script to send logs
-  app.get("/api/log", (req, res) => {
-    const { status, step, record } = req.query;
-    macroLogs.unshift({
-      time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
-      status: String(status || ""),
-      step: String(step || ""),
-      record: String(record || "")
-    });
-    if (macroLogs.length > 100) macroLogs.pop(); // Keep last 100 logs
-    res.sendStatus(200);
-  });
-
-  // API for the frontend to fetch logs
-  app.get("/api/logs", (req, res) => {
-    res.json(macroLogs);
-  });
-
   // API for the script to get the latest recommendation (legacy, keeping for compatibility if needed)
   app.get("/api/recommendation", (req, res) => {
     if (latestRecommendation) {
       res.json(latestRecommendation);
     } else {
       res.status(404).json({ error: "No recommendation available yet" });
-    }
-  });
-
-  // API for the script to get the exact click task string
-  app.get("/api/task", (req, res) => {
-    if (latestTaskString) {
-      res.send(latestTaskString);
-      // Clear it so it doesn't execute twice
-      latestTaskString = null;
-    } else {
-      res.send("NO_TASK");
-    }
-  });
-
-  // API for the client to post the exact click task string
-  app.post("/api/update-task", (req, res) => {
-    const { taskString } = req.body;
-    if (taskString) {
-      latestTaskString = taskString;
-      console.log("Received new macro task string");
-      res.status(200).json({ message: "Task updated" });
-    } else {
-      res.status(400).json({ error: "Invalid task string" });
     }
   });
 
@@ -99,14 +84,7 @@ async function startServer() {
       // Scraping is now the primary source
       if (true) { // Keeping structure for clarity
         try {
-          const response = await axios.get(url, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.9'
-            },
-            timeout: 10000
-          });
+          const response = await fetchWithRetry(url);
 
           const $ = cheerio.load(response.data);
 

@@ -113,145 +113,296 @@ export default function App() {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // App Settings
-  const defaultMacroConfig = {
-    numCoords: {
-      1: "100,200", 2: "150,200", 3: "200,200", 4: "250,200", 5: "300,200",
-      6: "100,250", 7: "150,250", 8: "200,250", 9: "250,250", 10: "300,250"
-    },
-    keypadCoords: {
-      1: "50,400", 2: "150,400", 3: "250,400",
-      4: "50,430", 5: "150,430", 6: "250,430",
-      7: "50,460", 8: "150,460", 9: "250,460",
-      0: "150,500"
-    },
-    keypadClear: "300,400",
-    keypadConfirm: "300,500",
-    amountInput: "200,300",
-    submitBet: "350,600",
-    betSteps: [10, 30, 70, 150]
-  };
-
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('app_settings');
-    const defaults: AppSettings = { macroHelper: false, macroConfig: defaultMacroConfig };
+    const defaults: AppSettings = { macroHelper: false };
     const savedSettings = saved ? JSON.parse(saved) : {};
-    
-    // Ensure macroConfig exists and has all required fields if partially saved
-    if (!savedSettings.macroConfig) {
-      savedSettings.macroConfig = defaultMacroConfig;
-    } else {
-      savedSettings.macroConfig = { ...defaultMacroConfig, ...savedSettings.macroConfig };
-    }
-    
     return { ...defaults, ...savedSettings };
   });
   const [macroInfo, setMacroInfo] = useState<{ period: string, numbers: number[] } | null>(null);
-  
-  // Console State
-  const [showConsole, setShowConsole] = useState(false);
-  const [macroLogs, setMacroLogs] = useState<{ time: string; status: string; step: string; record: string }[]>([]);
-
-  useEffect(() => {
-    if (window.location.hash === '#console') {
-      setShowConsole(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (showConsole) {
-      const fetchLogs = async () => {
-        try {
-          const res = await fetch('/api/logs');
-          if (res.ok) {
-            const data = await res.json();
-            setMacroLogs(data);
-          }
-        } catch (err) {
-          console.error("Failed to fetch logs", err);
-        }
-      };
-      fetchLogs();
-      interval = setInterval(fetchLogs, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [showConsole]);
 
   const autoElfScriptContent = `
 Rem =========================================================================================
-Rem == 按键精灵 (VBScript) - 全自动投注脚本 v16.0 (网页控制台版)
+Rem == 按键精灵 (VBScript) - 全自动投注脚本 v19.0 (高级定制窗体版)
 Rem =========================================================================================
 Rem 说明：
-Rem 1. 本版本无需在按键精灵中配置任何坐标！
-Rem 2. 请在网页端的【控制台】中填写所有坐标。
-Rem 3. 网页端会自动计算点击流程并发送给本脚本执行。
-Rem 4. 脚本运行状态和日志将实时同步到网页控制台。
+Rem 1. 请在按键精灵的【界面】选项卡中，创建一个窗体 (默认名称 Form1)
+Rem 2. 在窗体上添加以下组件并严格按照括号内的名称修改【名称】属性：
+Rem    [状态区]
+Rem    - 标签 (名称: LblStatus，标题: 已停止)
+Rem    - 标签 (名称: LblPeriod，标题: --)
+Rem    - 标签 (名称: LblStep，标题: --)
+Rem    [控制区]
+Rem    - 按钮 (名称: BtnBind，标题: 绑定窗口)
+Rem    - 按钮 (名称: BtnStart，标题: 启动)
+Rem    - 按钮 (名称: BtnStop，标题: 停止)
+Rem    [参数区]
+Rem    - 输入框 (名称: InpStep1，文本: 10)
+Rem    - 输入框 (名称: InpStep2，文本: 30)
+Rem    - 输入框 (名称: InpStep3，文本: 70)
+Rem    - 输入框 (名称: InpStep4，文本: 150)
+Rem    - 输入框 (名称: InpInterval，文本: 30)
+Rem    [日志区]
+Rem    - 输入框 (名称: TxtLog，请在属性中设置"多行"为"是")
+Rem 3. 将本代码全部复制到【源码】选项卡中。
 
-Dim Hwnd
+UserVar ServerURL="${window.location.origin}/api/recommendation" "【系统】开奖大师数据接口"
+UserVar ClickMode=1 "【系统】点击模式 (1=前台真实点击, 2=后台模拟点击)"
+
+UserVar Num1Coord="100,200" "【选号】号码 01 坐标"
+UserVar Num2Coord="150,200" "【选号】号码 02 坐标"
+UserVar Num3Coord="200,200" "【选号】号码 03 坐标"
+UserVar Num4Coord="250,200" "【选号】号码 04 坐标"
+UserVar Num5Coord="300,200" "【选号】号码 05 坐标"
+UserVar Num6Coord="100,250" "【选号】号码 06 坐标"
+UserVar Num7Coord="150,250" "【选号】号码 07 坐标"
+UserVar Num8Coord="200,250" "【选号】号码 08 坐标"
+UserVar Num9Coord="250,250" "【选号】号码 09 坐标"
+UserVar Num10Coord="300,250" "【选号】号码 10 坐标"
+
+UserVar AmountInputCoord="200,300" "【操作】'倍数'输入框坐标"
+UserVar SubmitBetCoord="350,600" "【操作】'立即投注'按钮坐标"
+
+UserVar KeyClearCoord="300,400" "【键盘】'清零'按钮坐标"
+UserVar KeyConfirmCoord="300,500" "【键盘】'确认'按钮坐标"
+UserVar Key0Coord="150,500" "【键盘】数字 0 坐标"
+UserVar Key1Coord="50,400" "【键盘】数字 1 坐标"
+UserVar Key2Coord="150,400" "【键盘】数字 2 坐标"
+UserVar Key3Coord="250,400" "【键盘】数字 3 坐标"
+UserVar Key4Coord="50,430" "【键盘】数字 4 坐标"
+UserVar Key5Coord="150,430" "【键盘】数字 5 坐标"
+UserVar Key6Coord="250,430" "【键盘】数字 6 坐标"
+UserVar Key7Coord="50,460" "【键盘】数字 7 坐标"
+UserVar Key8Coord="150,460" "【键盘】数字 8 坐标"
+UserVar Key9Coord="250,460" "【键盘】数字 9 坐标"
+
+Dim LastBetPeriod, Hwnd, IsRunning
+LastBetPeriod = ""
 Hwnd = 0
+IsRunning = False
 
-' 启动时自动打开控制台网页
-RunApp "http://127.0.0.1:3000/#console"
+' --- 界面按钮事件 ---
+Event Form1.BtnBind.Click
+    Call AddLog("请将鼠标移至游戏窗口内，按【回车键】(Enter) 绑定...")
+    Dim key
+    Do
+        key = WaitKey()
+        If key = 13 Then 
+            Hwnd = Plugin.Window.MousePoint()
+            Call AddLog("绑定成功！窗口句柄: " & Hwnd)
+            Form1.LblStatus.Caption = "已绑定"
+            Exit Do
+        End If
+    Loop
+End Event
 
-Function SendLog(sStatus, sStep, sRecord)
-    Dim Http, url
+Event Form1.BtnStart.Click
+    If Hwnd = 0 Then
+        Call AddLog("【警告】请先点击“绑定窗口”！")
+    Else
+        IsRunning = True
+        Form1.LblStatus.Caption = "运行中"
+        Call AddLog("脚本已启动，开始监听网页端指令...")
+    End If
+End Event
+
+Event Form1.BtnStop.Click
+    IsRunning = False
+    Form1.LblStatus.Caption = "已停止"
+    Call AddLog("脚本已停止运行。")
+End Event
+
+' --- 日志输出函数 ---
+Sub AddLog(msg)
+    Dim currentText
+    currentText = Form1.TxtLog.Text
+    ' 保持日志不要太长
+    If Len(currentText) > 2000 Then
+        currentText = Left(currentText, 2000)
+    End If
+    Form1.TxtLog.Text = "[" & Time & "] " & msg & vbCrLf & currentText
+End Sub
+
+' --- 主循环 ---
+Do
+    If IsRunning = True Then
+        Call CheckAPI()
+        
+        ' 获取界面上设置的轮询间隔
+        Dim intervalSec
+        intervalSec = CInt(Form1.InpInterval.Text)
+        If intervalSec < 5 Then intervalSec = 5 ' 最低5秒
+        
+        ' 每次检查完等待。为了防止界面卡死，分成多次1秒的延时
+        Dim i
+        For i = 1 To intervalSec
+            If IsRunning = False Then Exit For
+            Delay 1000
+        Next
+    Else
+        Delay 1000
+    End If
+Loop
+
+' --- 检查API并执行下注 ---
+Sub CheckAPI()
+    Dim Http, Ret, loopPeriod, loopNumbers, loopStep
     Set Http = CreateObject("MSXML2.XMLHTTP")
-    ' 简单的 URL 编码 (替换空格)
-    sStatus = Replace(sStatus, " ", "%20")
-    sStep = Replace(sStep, " ", "%20")
-    sRecord = Replace(sRecord, " ", "%20")
-    url = "http://127.0.0.1:3000/api/log?status=" & sStatus & "&step=" & sStep & "&record=" & sRecord
-    On Error Resume Next
-    Http.open "GET", url, False
+    On Error Resume Next 
+    Err.Clear 
+    Http.open "GET", ServerURL & "?t=" & Timer, False
     Http.Send
-    On Error GoTo 0
+    If Err.Number <> 0 Then
+        Call AddLog("【网络错误】无法连接到网页端，请检查网络或确认网页端已开启。")
+        Exit Sub
+    End If
+    
+    If Http.Status = 200 Then
+        Ret = Http.responseText
+        If InStr(Ret, """period""") > 0 Then
+            loopPeriod = Split(Split(Ret, """period"":""")(1), """")(0)
+            
+            Dim stepStr
+            stepStr = Split(Split(Ret, """step"":")(1), ",")(0)
+            stepStr = Replace(stepStr, "}", "")
+            stepStr = Replace(stepStr, "]", "")
+            loopStep = CInt(stepStr)
+            
+            loopNumbers = Split(Split(Ret, """numbers"":[")(1), "]")(0)
+            loopNumbers = Replace(loopNumbers, ",", " ")
+            
+            If loopPeriod <> "" And loopPeriod <> LastBetPeriod And loopStep >= 1 And loopStep <= 4 Then
+                Form1.LblPeriod.Caption = loopPeriod
+                Form1.LblStep.Caption = "第 " & CStr(loopStep) & " 轮"
+                Call AddLog("获取到新期号: " & loopPeriod & ", 轮次: " & loopStep)
+                Call PlaceBet(Hwnd, loopNumbers, loopStep)
+                LastBetPeriod = loopPeriod
+                Call AddLog("期号 " & loopPeriod & " 下注完毕，等待下期")
+            End If
+        End If
+    ElseIf Http.Status = 404 Then
+        ' 404表示网页端还没有生成推荐号码，静默等待即可
+    Else
+        Call AddLog("【网络异常】服务器返回状态码: " & Http.Status)
+    End If
+End Sub
+
+' --- 辅助函数: 获取对应轮次的金额 ---
+Function GetBetAmount(stepNum)
+    Dim amt
+    If CInt(stepNum) = 1 Then amt = Form1.InpStep1.Text
+    If CInt(stepNum) = 2 Then amt = Form1.InpStep2.Text
+    If CInt(stepNum) = 3 Then amt = Form1.InpStep3.Text
+    If CInt(stepNum) = 4 Then amt = Form1.InpStep4.Text
+    If CInt(stepNum) < 1 Or CInt(stepNum) > 4 Then amt = Form1.InpStep1.Text
+    GetBetAmount = CInt(amt)
 End Function
 
-SendLog "等待操作", "请锁定窗口", "脚本已启动"
-MessageBox "【第一步】请将鼠标移动到你要操作的投注软件窗口内，然后按【回车键】(Enter) 锁定该窗口。"
-Do
-    Dim key
-    key = WaitKey()
-    If key = 13 Then
-        Hwnd = Plugin.Window.MousePoint()
-        SendLog "正常运行", "等待网页端新指令...", "已成功锁定窗口句柄: " & Hwnd
-        Exit Do
-    End If
-Loop
+' --- 辅助函数: 获取选号坐标 ---
+Function GetCoordByNum(num)
+    Select Case CInt(num)
+        Case 1: GetCoordByNum = Num1Coord
+        Case 2: GetCoordByNum = Num2Coord
+        Case 3: GetCoordByNum = Num3Coord
+        Case 4: GetCoordByNum = Num4Coord
+        Case 5: GetCoordByNum = Num5Coord
+        Case 6: GetCoordByNum = Num6Coord
+        Case 7: GetCoordByNum = Num7Coord
+        Case 8: GetCoordByNum = Num8Coord
+        Case 9: GetCoordByNum = Num9Coord
+        Case 10: GetCoordByNum = Num10Coord
+    End Select
+End Function
 
-Dim HttpTask, Ret, commands, cmd, parts, i
-Set HttpTask = CreateObject("MSXML2.XMLHTTP")
+' --- 辅助函数: 获取小键盘数字坐标 ---
+Function GetKeyCoordByDigit(digit)
+    Select Case CStr(digit)
+        Case "0": GetKeyCoordByDigit = Key0Coord
+        Case "1": GetKeyCoordByDigit = Key1Coord
+        Case "2": GetKeyCoordByDigit = Key2Coord
+        Case "3": GetKeyCoordByDigit = Key3Coord
+        Case "4": GetKeyCoordByDigit = Key4Coord
+        Case "5": GetKeyCoordByDigit = Key5Coord
+        Case "6": GetKeyCoordByDigit = Key6Coord
+        Case "7": GetKeyCoordByDigit = Key7Coord
+        Case "8": GetKeyCoordByDigit = Key8Coord
+        Case "9": GetKeyCoordByDigit = Key9Coord
+    End Select
+End Function
 
-Do
-    On Error Resume Next
-    Err.Clear
-    HttpTask.open "GET", "http://127.0.0.1:3000/api/task", False
-    HttpTask.Send
-    If Err.Number = 0 Then
-        Ret = HttpTask.responseText
-        If Ret <> "NO_TASK" And Ret <> "" Then
-            SendLog "执行下注", "正在执行任务", "收到新任务，开始执行"
-            Call Plugin.Window.Restore(Hwnd)
-            Delay 500
-
-            commands = Split(Ret, "|")
-            For i = 0 To UBound(commands)
-                cmd = commands(i)
-                parts = Split(cmd, ",")
-                If parts(0) = "CLICK" Then
-                    Call Plugin.Bkgnd.LeftClick(Hwnd, CInt(parts(1)), CInt(parts(2)))
-                ElseIf parts(0) = "DELAY" Then
-                    Delay CInt(parts(1))
-                ElseIf parts(0) = "LOG" Then
-                    SendLog "执行下注", parts(1), ""
-                End If
-            Next
-
-            SendLog "正常运行", "等待下一期...", "任务执行完毕"
+' --- 辅助函数: 安全点击 (支持前台和后台) ---
+Sub SafeClick(coordStr, handle)
+    Dim coords, x, y
+    coords = Split(coordStr, ",")
+    If UBound(coords) >= 1 Then
+        x = CInt(coords(0))
+        y = CInt(coords(1))
+        If CInt(ClickMode) = 1 Then
+            MoveTo x, y
+            Delay 80
+            LeftClick 1
+            Delay 80
+        Else
+            Call Plugin.Bkgnd.LeftClick(handle, x, y)
+            Delay 150
         End If
     End If
-    Delay 2000
-Loop
+End Sub
+
+' --- 子程序: 后台下注流程 ---
+Sub PlaceBet(handle, numbersStr, stepNum)
+    Dim BetAmount
+    BetAmount = GetBetAmount(stepNum)
+
+    If CInt(ClickMode) = 1 Then
+        Call AddLog("正在激活窗口(前台)...")
+        Call Plugin.Window.Restore(handle)
+        Call Plugin.Window.Active(handle)
+        Delay 800
+    Else
+        Call AddLog("准备后台点击...")
+        Delay 300
+    End If
+
+    ' 1. 选中推荐号码
+    Call AddLog("正在选中推荐号码: " & numbersStr)
+    Dim arrNumbers, num
+    arrNumbers = Split(numbersStr, " ")
+    For Each num In arrNumbers
+        If IsNumeric(num) Then
+            Call SafeClick(GetCoordByNum(num), handle)
+            Delay 150
+        End If
+    Next
+    
+    ' 2. 点击“倍数”输入框，唤出小键盘
+    Call SafeClick(AmountInputCoord, handle)
+    Delay 600 
+    
+    ' 3. 点击小键盘“清零”
+    Call SafeClick(KeyClearCoord, handle)
+    Delay 300
+    
+    ' 4. 拆分金额数字并在小键盘上依次点击
+    Call AddLog("正在输入倍数: " & BetAmount)
+    Dim amountStr, i, digit
+    amountStr = CStr(BetAmount)
+    For i = 1 To Len(amountStr)
+        digit = Mid(amountStr, i, 1)
+        Call SafeClick(GetKeyCoordByDigit(digit), handle)
+        Delay 200
+    Next
+    
+    ' 5. 点击小键盘“确认”
+    Call SafeClick(KeyConfirmCoord, handle)
+    Delay 500
+    
+    ' 6. 点击“立即投注”
+    Call AddLog("点击立即投注")
+    Call SafeClick(SubmitBetCoord, handle)
+    Delay 500
+    
+End Sub
 `;
 
   const handleDownloadScript = () => {
@@ -588,63 +739,6 @@ Loop
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ period: nextPeriodStr, numbers: recommendedNumbers, step: bettingStep })
               }).catch(err => console.error("Failed to update recommendation API:", err));
-
-              // Generate the task string for the universal executor
-              if (settings.macroConfig) {
-                const config = settings.macroConfig;
-                const commands: string[] = [];
-                
-                // 1. Click numbers
-                commands.push(`LOG,正在选中推荐号码...`);
-                recommendedNumbers.forEach(num => {
-                  const coord = config.numCoords[num];
-                  if (coord) {
-                    commands.push(`CLICK,${coord}`);
-                    commands.push(`DELAY,150`);
-                  }
-                });
-                
-                // 2. Click amount input
-                commands.push(`LOG,正在唤出小键盘...`);
-                commands.push(`CLICK,${config.amountInput}`);
-                commands.push(`DELAY,600`);
-                
-                // 3. Click clear
-                commands.push(`LOG,正在清零倍数...`);
-                commands.push(`CLICK,${config.keypadClear}`);
-                commands.push(`DELAY,300`);
-                
-                // 4. Click digits
-                const amount = config.betSteps[bettingStep - 1] || config.betSteps[0];
-                commands.push(`LOG,正在输入倍数: ${amount}`);
-                const amountStr = String(amount);
-                for (let i = 0; i < amountStr.length; i++) {
-                  const digit = parseInt(amountStr[i]);
-                  const coord = config.keypadCoords[digit];
-                  if (coord) {
-                    commands.push(`CLICK,${coord}`);
-                    commands.push(`DELAY,200`);
-                  }
-                }
-                
-                // 5. Click confirm
-                commands.push(`LOG,确认倍数...`);
-                commands.push(`CLICK,${config.keypadConfirm}`);
-                commands.push(`DELAY,500`);
-                
-                // 6. Click submit
-                commands.push(`LOG,点击立即投注...`);
-                commands.push(`CLICK,${config.submitBet}`);
-                commands.push(`DELAY,500`);
-                
-                const taskString = commands.join('|');
-                
-                fetch('/api/update-task', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ taskString })
-                }).catch(err => console.error("Failed to update task API:", err));
-              }
             }
 
             if (enableVoice && 'speechSynthesis' in window) {
@@ -1204,7 +1298,7 @@ Loop
 
                 {/* Auto-betting Settings */}
                 <div className="pt-4 border-t border-[#141414]/10">
-                  <h3 className="font-serif font-bold italic text-base mb-3">按键精灵助手</h3>
+                  <h3 className="font-serif font-bold italic text-base mb-3">按键精灵助手 (独立运行程序版)</h3>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="flex items-center gap-2 text-xs font-mono">
@@ -1216,14 +1310,17 @@ Loop
                         />
                         启用按键精灵自动下注
                       </label>
-                      <button onClick={handleDownloadScript} className="text-xs font-mono uppercase bg-white border border-[#141414] px-3 py-1 hover:bg-gray-100 transition-colors flex items-center gap-2">
+                      <button onClick={handleDownloadScript} className="text-xs font-mono uppercase bg-[#141414] text-[#E4E3E0] px-3 py-1 hover:bg-emerald-600 transition-colors flex items-center gap-2">
                         <Download size={12} />
                         下载新版脚本
                       </button>
                     </div>
-                    <p className="text-[11px] font-mono text-gray-500 pt-2">
-                      启用后，网页端将通过API向按键精灵发送开奖指令。请在【脚本控制台】中配置您的屏幕坐标。
-                    </p>
+                    <div className="text-[11px] font-mono text-gray-500 pt-2 space-y-1">
+                      <p>1. 在按键精灵中新建一个脚本，点击<strong className="text-[#141414]">【界面】</strong>选项卡。</p>
+                      <p>2. 按照脚本顶部的注释说明，添加对应的<strong className="text-[#141414]">【标签】、【按钮】和【输入框】</strong>，并修改它们的<strong className="text-[#141414]">【名称】</strong>属性。</p>
+                      <p>3. 点击上方按钮下载脚本，并全部粘贴到<strong className="text-[#141414]">【源码】</strong>选项卡中。</p>
+                      <p>4. 运行脚本，您将看到自己设计的高级控制终端！</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1268,187 +1365,6 @@ Loop
                 </div>
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      {/* Macro Console Modal */}
-      <AnimatePresence>
-        {showConsole && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-[#141414]/90 backdrop-blur-sm p-4"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="bg-[#1e1e1e] border border-gray-700 w-full max-w-5xl shadow-2xl flex flex-col h-[85vh] text-gray-300"
-            >
-              <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-[#141414]">
-                <div className="flex items-center gap-3">
-                  <Bot className="text-indigo-400" size={24} />
-                  <h2 className="text-xl font-mono font-bold text-white">按键精灵 - 网页控制台</h2>
-                  {macroLogs.length > 0 && (
-                    <span className="ml-4 px-2 py-1 bg-green-900/50 text-green-400 text-[10px] font-mono rounded border border-green-700">
-                      {macroLogs[0].status}
-                    </span>
-                  )}
-                </div>
-                <button 
-                  onClick={() => {
-                    setShowConsole(false);
-                    window.location.hash = '';
-                  }}
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  <XCircle size={24} />
-                </button>
-              </div>
-              
-              <div className="flex flex-1 overflow-hidden">
-                {/* Left Panel: Logs & Status */}
-                <div className="w-1/2 border-r border-gray-700 flex flex-col bg-[#1a1a1a]">
-                  <div className="p-3 border-b border-gray-700 bg-[#222] font-mono text-xs text-gray-400 uppercase tracking-wider">
-                    实时运行日志
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-xs">
-                    {macroLogs.length === 0 ? (
-                      <div className="text-gray-600 italic">等待脚本连接...</div>
-                    ) : (
-                      macroLogs.map((log, idx) => (
-                        <div key={idx} className="flex gap-3 border-b border-gray-800 pb-2">
-                          <span className="text-gray-500 shrink-0">[{log.time}]</span>
-                          <div className="flex flex-col">
-                            <span className={log.status.includes('正常') ? 'text-green-400' : 'text-indigo-400'}>
-                              {log.status} - {log.step}
-                            </span>
-                            {log.record && <span className="text-gray-400 mt-1">{log.record}</span>}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/* Right Panel: Configuration */}
-                <div className="w-1/2 flex flex-col bg-[#1e1e1e]">
-                  <div className="p-3 border-b border-gray-700 bg-[#222] font-mono text-xs text-gray-400 uppercase tracking-wider flex justify-between items-center">
-                    <span>坐标与倍数配置 (实时生效)</span>
-                    <button onClick={handleDownloadScript} className="text-[10px] bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-500 transition-colors flex items-center gap-1">
-                      <Download size={10} /> 下载控制台版脚本
-                    </button>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                    {settings.macroConfig && (
-                      <>
-                        <div>
-                          <label className="block text-xs font-mono uppercase mb-3 text-gray-400">选号坐标 (1-10)</label>
-                          <div className="grid grid-cols-5 gap-3">
-                            {[1,2,3,4,5,6,7,8,9,10].map(num => (
-                              <div key={`num-${num}`}>
-                                <span className="text-[10px] text-gray-500 mb-1 block">号码 {num}</span>
-                                <input 
-                                  type="text" 
-                                  value={settings.macroConfig!.numCoords[num] || ''}
-                                  onChange={e => setSettings(s => ({
-                                    ...s, 
-                                    macroConfig: { ...s.macroConfig!, numCoords: { ...s.macroConfig!.numCoords, [num]: e.target.value } }
-                                  }))}
-                                  className="w-full bg-[#141414] border border-gray-700 px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
-                                  placeholder="x,y"
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-mono uppercase mb-3 text-gray-400">小键盘坐标 (0-9)</label>
-                          <div className="grid grid-cols-5 gap-3">
-                            {[1,2,3,4,5,6,7,8,9,0].map(num => (
-                              <div key={`keypad-${num}`}>
-                                <span className="text-[10px] text-gray-500 mb-1 block">按键 {num}</span>
-                                <input 
-                                  type="text" 
-                                  value={settings.macroConfig!.keypadCoords[num] || ''}
-                                  onChange={e => setSettings(s => ({
-                                    ...s, 
-                                    macroConfig: { ...s.macroConfig!, keypadCoords: { ...s.macroConfig!.keypadCoords, [num]: e.target.value } }
-                                  }))}
-                                  className="w-full bg-[#141414] border border-gray-700 px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
-                                  placeholder="x,y"
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-[10px] font-mono uppercase mb-1 text-gray-500">倍数输入框坐标</label>
-                            <input 
-                              type="text" 
-                              value={settings.macroConfig!.amountInput}
-                              onChange={e => setSettings(s => ({ ...s, macroConfig: { ...s.macroConfig!, amountInput: e.target.value } }))}
-                              className="w-full bg-[#141414] border border-gray-700 px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-mono uppercase mb-1 text-gray-500">立即投注坐标</label>
-                            <input 
-                              type="text" 
-                              value={settings.macroConfig!.submitBet}
-                              onChange={e => setSettings(s => ({ ...s, macroConfig: { ...s.macroConfig!, submitBet: e.target.value } }))}
-                              className="w-full bg-[#141414] border border-gray-700 px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-mono uppercase mb-1 text-gray-500">小键盘清零坐标</label>
-                            <input 
-                              type="text" 
-                              value={settings.macroConfig!.keypadClear}
-                              onChange={e => setSettings(s => ({ ...s, macroConfig: { ...s.macroConfig!, keypadClear: e.target.value } }))}
-                              className="w-full bg-[#141414] border border-gray-700 px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-mono uppercase mb-1 text-gray-500">小键盘确认坐标</label>
-                            <input 
-                              type="text" 
-                              value={settings.macroConfig!.keypadConfirm}
-                              onChange={e => setSettings(s => ({ ...s, macroConfig: { ...s.macroConfig!, keypadConfirm: e.target.value } }))}
-                              className="w-full bg-[#141414] border border-gray-700 px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-mono uppercase mb-3 text-gray-400">策略倍数 (第1-4轮)</label>
-                          <div className="grid grid-cols-4 gap-3">
-                            {[0, 1, 2, 3].map(idx => (
-                              <div key={`step-${idx}`}>
-                                <span className="text-[10px] text-gray-500 mb-1 block">第 {idx + 1} 轮</span>
-                                <input 
-                                  type="number" 
-                                  value={settings.macroConfig!.betSteps[idx] || 0}
-                                  onChange={e => {
-                                    const newSteps = [...settings.macroConfig!.betSteps];
-                                    newSteps[idx] = parseInt(e.target.value) || 0;
-                                    setSettings(s => ({ ...s, macroConfig: { ...s.macroConfig!, betSteps: newSteps } }));
-                                  }}
-                                  className="w-full bg-[#141414] border border-gray-700 px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
