@@ -137,6 +137,7 @@ Rem    - 按钮 (名称: BtnBind，标题: 绑定窗口)
 Rem    - 按钮 (名称: BtnStart，标题: 启动)
 Rem    - 按钮 (名称: BtnStop，标题: 停止)
 Rem    [参数区]
+Rem    - 输入框 (名称: InpClickMode，文本: 1)  <-- 1=前台真实点击, 2=后台模拟点击
 Rem    - 输入框 (名称: InpStep1，文本: 10)
 Rem    - 输入框 (名称: InpStep2，文本: 30)
 Rem    - 输入框 (名称: InpStep3，文本: 70)
@@ -147,7 +148,6 @@ Rem    - 输入框 (名称: TxtLog，请在属性中设置"多行"为"是")
 Rem 3. 将本代码全部复制到【源码】选项卡中。
 
 UserVar ServerURL="${window.location.origin}/api/recommendation" "【系统】开奖大师数据接口"
-UserVar ClickMode=1 "【系统】点击模式 (1=前台真实点击, 2=后台模拟点击)"
 
 UserVar Num1Coord="100,200" "【选号】号码 01 坐标"
 UserVar Num2Coord="150,200" "【选号】号码 02 坐标"
@@ -332,12 +332,15 @@ End Function
 
 ' --- 辅助函数: 安全点击 (支持前台和后台) ---
 Sub SafeClick(coordStr, handle)
-    Dim coords, x, y
+    Dim coords, x, y, mode
     coords = Split(coordStr, ",")
+    mode = CInt(Form1.InpClickMode.Text)
+    If mode <> 1 And mode <> 2 Then mode = 1 ' 默认前台
+    
     If UBound(coords) >= 1 Then
         x = CInt(coords(0))
         y = CInt(coords(1))
-        If CInt(ClickMode) = 1 Then
+        If mode = 1 Then
             MoveTo x, y
             Delay 80
             LeftClick 1
@@ -351,10 +354,12 @@ End Sub
 
 ' --- 子程序: 后台下注流程 ---
 Sub PlaceBet(handle, numbersStr, stepNum)
-    Dim BetAmount
+    Dim BetAmount, mode
     BetAmount = GetBetAmount(stepNum)
+    mode = CInt(Form1.InpClickMode.Text)
+    If mode <> 1 And mode <> 2 Then mode = 1
 
-    If CInt(ClickMode) = 1 Then
+    If mode = 1 Then
         Call AddLog("正在激活窗口(前台)...")
         Call Plugin.Window.Restore(handle)
         Call Plugin.Window.Active(handle)
