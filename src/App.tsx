@@ -137,6 +137,7 @@ Rem    - 按钮 (名称: BtnBind，标题: 绑定窗口)
 Rem    - 按钮 (名称: BtnStart，标题: 启动)
 Rem    - 按钮 (名称: BtnStop，标题: 停止)
 Rem    [参数区]
+Rem    - 输入框 (名称: InpServerURL，文本: http://127.0.0.1:3000/api/recommendation)
 Rem    - 输入框 (名称: InpClickMode，文本: 1)  <-- 1=前台真实点击, 2=后台模拟点击
 Rem    - 输入框 (名称: InpStep1，文本: 10)
 Rem    - 输入框 (名称: InpStep2，文本: 30)
@@ -146,8 +147,6 @@ Rem    - 输入框 (名称: InpInterval，文本: 30)
 Rem    [日志区]
 Rem    - 输入框 (名称: TxtLog，请在属性中设置"多行"为"是")
 Rem 3. 将本代码全部复制到【源码】选项卡中。
-
-UserVar ServerURL="${window.location.origin}/api/recommendation" "【系统】开奖大师数据接口"
 
 UserVar Num1Coord="100,200" "【选号】号码 01 坐标"
 UserVar Num2Coord="150,200" "【选号】号码 02 坐标"
@@ -246,14 +245,18 @@ Loop
 
 ' --- 检查API并执行下注 ---
 Sub CheckAPI()
-    Dim Http, Ret, loopPeriod, loopNumbers, loopStep
-    Set Http = CreateObject("MSXML2.XMLHTTP")
+    Dim Http, Ret, loopPeriod, loopNumbers, loopStep, currentUrl
+    Set Http = CreateObject("MSXML2.ServerXMLHTTP")
+    currentUrl = Form1.InpServerURL.Text
+    If currentUrl = "" Then currentUrl = "http://127.0.0.1:3000/api/recommendation"
+    
     On Error Resume Next 
     Err.Clear 
-    Http.open "GET", ServerURL & "?t=" & Timer, False
+    Http.open "GET", currentUrl & "?t=" & Timer, False
     Http.Send
     If Err.Number <> 0 Then
-        Call AddLog("【网络错误】无法连接到网页端，请检查网络或确认网页端已开启。")
+        Call AddLog("【网络错误】无法连接到网页端，请检查接口地址是否正确，或确认本地网页端已开启。")
+        Call AddLog("当前尝试连接的地址: " & currentUrl)
         Exit Sub
     End If
     
