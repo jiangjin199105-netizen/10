@@ -281,12 +281,16 @@ Sub CheckAPI()
                 Call PlaceBet(Hwnd, loopNumbers, loopStep)
                 LastBetPeriod = loopPeriod
                 Call AddLog("期号 " & loopPeriod & " 下注完毕，等待下期")
+                Form1.LblStatus.Caption = "等待下期"
+            ElseIf loopPeriod = LastBetPeriod Then
+                Form1.LblStatus.Caption = "等待新期号"
             End If
         End If
     ElseIf Http.Status = 404 Then
-        ' 404表示网页端还没有生成推荐号码，静默等待即可
+        Form1.LblStatus.Caption = "等待网页端出号"
     Else
         Call AddLog("【网络异常】服务器返回状态码: " & Http.Status)
+        Form1.LblStatus.Caption = "网络异常"
     End If
 End Sub
 
@@ -698,17 +702,17 @@ End Sub
           let recommendedNumbers: number[] = [];
 
           if (index === 0) { // 1st position in 46th
-            // 1, 3, 4, 5名 -> indices 0, 2, 3, 4 from 45th
-            recommendedNumbers = [targetNums45[0], targetNums45[2], targetNums45[3], targetNums45[4]];
-          } else if (index === 9) { // 10th position in 46th
             // 6, 7, 8, 10名 -> indices 5, 6, 7, 9 from 45th
             recommendedNumbers = [targetNums45[5], targetNums45[6], targetNums45[7], targetNums45[9]];
+          } else if (index === 9) { // 10th position in 46th
+            // 1, 3, 4, 5名 -> indices 0, 2, 3, 4 from 45th
+            recommendedNumbers = [targetNums45[0], targetNums45[2], targetNums45[3], targetNums45[4]];
           } else if (index >= 1 && index <= 4) { // Left half (not 1st) in 46th
-            // 2, 3, 4, 5名 -> indices 1, 2, 3, 4 from 45th
-            recommendedNumbers = [targetNums45[1], targetNums45[2], targetNums45[3], targetNums45[4]];
-          } else if (index >= 5 && index <= 8) { // Right half (not 10th) in 46th
             // 6, 7, 8, 9名 -> indices 5, 6, 7, 8 from 45th
             recommendedNumbers = [targetNums45[5], targetNums45[6], targetNums45[7], targetNums45[8]];
+          } else if (index >= 5 && index <= 8) { // Right half (not 10th) in 46th
+            // 2, 3, 4, 5名 -> indices 1, 2, 3, 4 from 45th
+            recommendedNumbers = [targetNums45[1], targetNums45[2], targetNums45[3], targetNums45[4]];
           }
 
           if (recommendedNumbers.length > 0) {
@@ -1244,6 +1248,24 @@ End Sub
               </div>
               
               <div className="p-8 space-y-6 overflow-y-auto">
+                
+                <div className="bg-white/50 p-4 rounded border border-gray-200">
+                  <h3 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
+                    <GitCompare size={14} className="text-emerald-600"/>
+                    当前选号逻辑 (v20.0)
+                  </h3>
+                  <div className="text-[11px] font-mono text-gray-600 space-y-1.5 leading-relaxed">
+                    <p>定位：取【最新1期】冠军号码，看它在【倒数第47期】排第几名(N)。</p>
+                    <div className="pl-2 border-l-2 border-emerald-200 space-y-1">
+                      <p>• 若 N=1 (第1名) → 取第 6, 7, 8, 10 名</p>
+                      <p>• 若 N=10 (第10名) → 取第 1, 3, 4, 5 名</p>
+                      <p>• 若 N=2~5 (左半区) → 取第 6, 7, 8, 9 名</p>
+                      <p>• 若 N=6~9 (右半区) → 取第 2, 3, 4, 5 名</p>
+                    </div>
+                    <p className="text-gray-400 italic mt-1">* 数据源自倒数第46期</p>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-[10px] font-mono uppercase mb-2 opacity-60">数据源网址 (网页抓取)</label>
                   <div className="flex gap-2">
