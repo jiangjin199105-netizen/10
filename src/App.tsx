@@ -143,6 +143,8 @@ Rem    - 输入框 (名称: InpStep1，文本: 10)
 Rem    - 输入框 (名称: InpStep2，文本: 30)
 Rem    - 输入框 (名称: InpStep3，文本: 70)
 Rem    - 输入框 (名称: InpStep4，文本: 150)
+Rem    - 输入框 (名称: InpStep5，文本: 350)
+Rem    - 输入框 (名称: InpStep6，文本: 800)
 Rem    - 输入框 (名称: InpInterval，文本: 30)
 Rem    [日志区]
 Rem    - 输入框 (名称: TxtLog，请在属性中设置"多行"为"是")
@@ -274,7 +276,7 @@ Sub CheckAPI()
             loopNumbers = Split(Split(Ret, """numbers"":[")(1), "]")(0)
             loopNumbers = Replace(loopNumbers, ",", " ")
             
-            If loopPeriod <> "" And loopPeriod <> LastBetPeriod And loopStep >= 1 And loopStep <= 4 Then
+            If loopPeriod <> "" And loopPeriod <> LastBetPeriod And loopStep >= 1 And loopStep <= 6 Then
                 Form1.LblPeriod.Caption = loopPeriod
                 Form1.LblStep.Caption = "第 " & CStr(loopStep) & " 轮"
                 Call AddLog("获取到新期号: " & loopPeriod & ", 轮次: " & loopStep)
@@ -301,7 +303,9 @@ Function GetBetAmount(stepNum)
     If CInt(stepNum) = 2 Then amt = Form1.InpStep2.Text
     If CInt(stepNum) = 3 Then amt = Form1.InpStep3.Text
     If CInt(stepNum) = 4 Then amt = Form1.InpStep4.Text
-    If CInt(stepNum) < 1 Or CInt(stepNum) > 4 Then amt = Form1.InpStep1.Text
+    If CInt(stepNum) = 5 Then amt = Form1.InpStep5.Text
+    If CInt(stepNum) = 6 Then amt = Form1.InpStep6.Text
+    If CInt(stepNum) < 1 Or CInt(stepNum) > 6 Then amt = Form1.InpStep1.Text
     GetBetAmount = CInt(amt)
 End Function
 
@@ -722,10 +726,10 @@ End Sub
             
             if (lastRec) {
               if (lastRec.status === 'lost') {
-                if (lastRec.bettingStep < 4) {
+                if (lastRec.bettingStep < 6) {
                   bettingStep = lastRec.bettingStep + 1;
                 } else {
-                  bettingStep = 1; // Reset after 4 losses
+                  bettingStep = 1; // Reset after 6 losses
                 }
               } else {
                 bettingStep = 1; // Reset after win
@@ -1153,7 +1157,9 @@ End Sub
                               rec.bettingStep === 1 ? 'bg-gray-200 text-gray-700' :
                               rec.bettingStep === 2 ? 'bg-blue-100 text-blue-700' :
                               rec.bettingStep === 3 ? 'bg-purple-100 text-purple-700' :
-                              'bg-red-100 text-red-700'
+                              rec.bettingStep === 4 ? 'bg-orange-100 text-orange-700' :
+                              rec.bettingStep === 5 ? 'bg-red-100 text-red-700' :
+                              'bg-rose-900 text-white'
                             }`}>
                               第{rec.bettingStep}轮
                             </span>
