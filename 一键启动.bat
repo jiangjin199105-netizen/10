@@ -10,22 +10,38 @@ echo.
 echo [提示] 正在检查运行环境...
 
 :: Check Node.js
-where node >nul 2>nul
+node -v >nul 2>&1
 if !errorlevel! neq 0 (
     echo [错误] 未找到 Node.js 环境！
+    echo.
+    echo 可能的原因：
+    echo 1. 您还没有安装 Node.js。
+    echo 2. 您刚刚安装完 Node.js，但还没有重启电脑或重新打开文件夹。
+    echo.
     echo 请前往 https://nodejs.org/ 下载并安装 Node.js (推荐 LTS 版本)
+    echo 如果已经安装，请尝试【重启电脑】后再运行。
+    pause
+    exit /b
+)
+
+:: Check NPM
+call npm -v >nul 2>&1
+if !errorlevel! neq 0 (
+    echo [错误] 未找到 npm 环境！
+    echo 这通常随 Node.js 一起安装。请尝试重新安装 Node.js。
     pause
     exit /b
 )
 
 :: Run deep check
-if exist "check_env.js" (
-    node check_env.js
+if exist "check_env.cjs" (
+    node check_env.cjs
     if !errorlevel! neq 0 (
         echo.
-        echo [警告] 环境检查未通过，尝试自动修复...
+        echo [警告] 环境检查未通过，正在尝试自动安装依赖...
+        echo 这可能需要几分钟，请不要关闭窗口。
         call npm install
-        node check_env.js
+        node check_env.cjs
         if !errorlevel! neq 0 (
             echo [错误] 自动修复失败。请手动运行“重新安装依赖.bat”。
             pause
