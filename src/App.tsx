@@ -122,148 +122,132 @@ export default function App() {
   const [macroInfo, setMacroInfo] = useState<{ period: string, numbers: number[] } | null>(null);
 
   const autoElfScriptContent = `
-Rem =========================================================================================
-Rem == 按键精灵 (VBScript) - 全自动投注脚本 v19.0 (高级定制窗体版)
-Rem =========================================================================================
-Rem 说明：
-Rem 1. 请在按键精灵的【界面】选项卡中，创建一个窗体 (默认名称 Form1)
-Rem 2. 在窗体上添加以下组件并严格按照括号内的名称修改【名称】属性：
-Rem    [状态区]
-Rem    - 标签 (名称: LblStatus，标题: 已停止)
-Rem    - 标签 (名称: LblPeriod，标题: --)
-Rem    - 标签 (名称: LblStep，标题: --)
-Rem    [控制区]
-Rem    - 按钮 (名称: BtnBind，标题: 绑定窗口)
-Rem    - 按钮 (名称: BtnStart，标题: 启动)
-Rem    - 按钮 (名称: BtnStop，标题: 停止)
-Rem    [参数区]
-Rem    - 输入框 (名称: InpServerURL，文本: http://127.0.0.1:3000/api/recommendation)
-Rem    - 输入框 (名称: InpClickMode，文本: 1)  <-- 1=前台真实点击, 2=后台模拟点击
-Rem    - 输入框 (名称: InpStep1，文本: 10)
-Rem    - 输入框 (名称: InpStep2，文本: 30)
-Rem    - 输入框 (名称: InpStep3，文本: 70)
-Rem    - 输入框 (名称: InpStep4，文本: 150)
-Rem    - 输入框 (名称: InpStep5，文本: 350)
-Rem    - 输入框 (名称: InpStep6，文本: 800)
-Rem    - 输入框 (名称: InpInterval，文本: 30)
-Rem    [日志区]
-Rem    - 输入框 (名称: TxtLog，请在属性中设置"多行"为"是")
-Rem 3. 将本代码全部复制到【源码】选项卡中。
+' ///////////////////////////////////////////////////////////////////////////////////////////
+' ///////////////////////////// 【可视化界面代码区域】 //////////////////////////////////////
+' ///////////////////////////////////////////////////////////////////////////////////////////
 
-UserVar Num1Coord="100,200" "【选号】号码 01 坐标"
-UserVar Num2Coord="150,200" "【选号】号码 02 坐标"
-UserVar Num3Coord="200,200" "【选号】号码 03 坐标"
-UserVar Num4Coord="250,200" "【选号】号码 04 坐标"
-UserVar Num5Coord="300,200" "【选号】号码 05 坐标"
-UserVar Num6Coord="100,250" "【选号】号码 06 坐标"
-UserVar Num7Coord="150,250" "【选号】号码 07 坐标"
-UserVar Num8Coord="200,250" "【选号】号码 08 坐标"
-UserVar Num9Coord="250,250" "【选号】号码 09 坐标"
-UserVar Num10Coord="300,250" "【选号】号码 10 坐标"
+UserVar ServerURL="http://127.0.0.1:3000/api/recommendation" "【系统】开奖大师数据接口"
+UserVar ClickMode=1 "【系统】点击模式 (1=前台真实点击, 2=后台模拟点击)"
 
-UserVar AmountInputCoord="200,300" "【操作】'倍数'输入框坐标"
-UserVar SubmitBetCoord="350,600" "【操作】'立即投注'按钮坐标"
+UserVar Num1Coord="829,481" "【选号】号码 01 坐标"
+UserVar Num2Coord="925,485" "【选号】号码 02 坐标"
+UserVar Num3Coord="1024,483" "【选号】号码 03 坐标"
+UserVar Num4Coord="1123,475" "【选号】号码 04 坐标"
+UserVar Num5Coord="1198,479" "【选号】号码 05 坐标"
+UserVar Num6Coord="828,573" "【选号】号码 06 坐标"
+UserVar Num7Coord="921,574" "【选号】号码 07 坐标"
+UserVar Num8Coord="1037,580" "【选号】号码 08 坐标"
+UserVar Num9Coord="1101,575" "【选号】号码 09 坐标"
+UserVar Num10Coord="1209,594" "【选号】号码 10 坐标"
 
-UserVar KeyClearCoord="300,400" "【键盘】'清零'按钮坐标"
-UserVar KeyConfirmCoord="300,500" "【键盘】'确认'按钮坐标"
-UserVar Key0Coord="150,500" "【键盘】数字 0 坐标"
-UserVar Key1Coord="50,400" "【键盘】数字 1 坐标"
-UserVar Key2Coord="150,400" "【键盘】数字 2 坐标"
-UserVar Key3Coord="250,400" "【键盘】数字 3 坐标"
-UserVar Key4Coord="50,430" "【键盘】数字 4 坐标"
-UserVar Key5Coord="150,430" "【键盘】数字 5 坐标"
-UserVar Key6Coord="250,430" "【键盘】数字 6 坐标"
-UserVar Key7Coord="50,460" "【键盘】数字 7 坐标"
-UserVar Key8Coord="150,460" "【键盘】数字 8 坐标"
-UserVar Key9Coord="250,460" "【键盘】数字 9 坐标"
+UserVar AmountInputCoord="1049,836" "【操作】'倍数'输入框坐标"
+UserVar SubmitBetCoord="1174,999" "【操作】'立即投注'按钮坐标"
 
-Dim LastBetPeriod, Hwnd, IsRunning
+UserVar KeyClearCoord="1203,730" "【键盘】'清零'按钮坐标"
+UserVar KeyConfirmCoord="1215,824" "【键盘】'确认'按钮坐标"
+UserVar Key0Coord="944,842" "【键盘】数字 0 坐标"
+UserVar Key1Coord="785,626" "【键盘】数字 1 坐标"
+UserVar Key2Coord="942,630" "【键盘】数字 2 坐标"
+UserVar Key3Coord="1084,630" "【键盘】数字 3 坐标"
+UserVar Key4Coord="799,700" "【键盘】数字 4 坐标"
+UserVar Key5Coord="951,695" "【键盘】数字 5 坐标"
+UserVar Key6Coord="1086,695" "【键盘】数字 6 坐标"
+UserVar Key7Coord="781,769" "【键盘】数字 7 坐标"
+UserVar Key8Coord="932,773" "【键盘】数字 8 坐标"
+UserVar Key9Coord="1073,767" "【键盘】数字 9 坐标"
+
+UserVar BetStep1=1 "【策略】第1轮倍数"
+UserVar BetStep2=2 "【策略】第2轮倍数"
+UserVar BetStep3=4 "【策略】第3轮倍数"
+UserVar BetStep4=8 "【策略】第4轮倍数"
+UserVar BetStep5=16 "【策略】第5轮倍数"
+UserVar BetStep6=32 "【策略】第6轮倍数"
+
+' ///////////////////////////// 【可视化界面代码结束】 //////////////////////////////////////
+' ///////////////////////////////////////////////////////////////////////////////////////////
+
+Dim LastBetPeriod, Hwnd
+Dim LogWindow
+
 LastBetPeriod = ""
 Hwnd = 0
-IsRunning = False
 
-' --- 界面按钮事件 ---
-Event Form1.BtnBind.Click
-    Call AddLog("请将鼠标移至游戏窗口内，按【回车键】(Enter) 绑定...")
-    Dim key
-    Do
-        key = WaitKey()
-        If key = 13 Then 
-            Hwnd = Plugin.Window.MousePoint()
-            Call AddLog("绑定成功！窗口句柄: " & Hwnd)
-            Form1.LblStatus.Caption = "已绑定"
-            Exit Do
-        End If
-    Loop
-End Event
-
-Event Form1.BtnStart.Click
-    If Hwnd = 0 Then
-        Call AddLog("【警告】请先点击“绑定窗口”！")
-    Else
-        IsRunning = True
-        Form1.LblStatus.Caption = "运行中"
-        Call AddLog("脚本已启动，开始监听网页端指令...")
-    End If
-End Event
-
-Event Form1.BtnStop.Click
-    IsRunning = False
-    Form1.LblStatus.Caption = "已停止"
-    Call AddLog("脚本已停止运行。")
-End Event
-
-' --- 日志输出函数 ---
-Sub AddLog(msg)
-    Dim currentText
-    currentText = Form1.TxtLog.Text
-    ' 保持日志不要太长
-    If Len(currentText) > 2000 Then
-        currentText = Left(currentText, 2000)
-    End If
-    Form1.TxtLog.Text = "[" & Time & "] " & msg & vbCrLf & currentText
+' --- 初始化日志窗口 ---
+Sub InitLogWindow()
+    On Error Resume Next
+    Set LogWindow = CreateObject("InternetExplorer.Application")
+    LogWindow.Navigate "about:blank"
+    LogWindow.ToolBar = False
+    LogWindow.StatusBar = False
+    LogWindow.MenuBar = False
+    LogWindow.Width = 450
+    LogWindow.Height = 650
+    LogWindow.Visible = True
+    LogWindow.Document.Title = "开奖大师 - 运行状态监控"
+    LogWindow.Document.Body.Style.backgroundColor = "#1e1e1e"
+    LogWindow.Document.Body.Style.color = "#d4d4d4"
+    LogWindow.Document.Body.Style.fontFamily = "Microsoft YaHei, Consolas, monospace"
+    LogWindow.Document.Body.Style.fontSize = "13px"
+    LogWindow.Document.Body.Style.margin = "15px"
+    LogWindow.Document.Body.InnerHTML = "<h3 style='color:#4ade80; margin-top:0; border-bottom:1px solid #333; padding-bottom:10px;'>开奖大师 - 自动投注监控</h3><div id='statusBox' style='background:#2d2d2d; padding:10px; border-radius:5px; margin-bottom:10px;'><strong style='color:#60a5fa;'>当前状态:</strong> <span id='sysStatus'>初始化</span><br><strong style='color:#60a5fa;'>当前步骤:</strong> <span id='sysStep'>准备启动</span></div><div style='font-weight:bold; margin-bottom:5px; color:#9ca3af;'>操作日志:</div><div id='logContent' style='height:420px; overflow-y:auto; background:#141414; padding:10px; border:1px solid #333;'></div>"
+    
 End Sub
 
-' --- 主循环 ---
+Call InitLogWindow()
+
+' --- 状态更新与日志记录函数 ---
+Sub UpdateMonitor(sStatus, sStep, sRecord)
+    On Error Resume Next
+    
+    ' 检查窗口是否被关闭，如果关闭则重新创建
+    Dim test
+    test = LogWindow.Name
+    If Err.Number <> 0 Then
+        Err.Clear
+        Call InitLogWindow()
+    End If
+    
+    ' 更新状态
+    If sStatus <> "" Then LogWindow.Document.getElementById("sysStatus").innerText = sStatus
+    If sStep <> "" Then LogWindow.Document.getElementById("sysStep").innerText = sStep
+    
+    ' 追加日志 (最新的在最上面)
+    If sRecord <> "" Then 
+        Dim logHtml, currentHtml
+        logHtml = "<div style='margin-bottom:5px; border-bottom:1px dashed #333; padding-bottom:5px;'><span style='color:#8b949e;'>[" & Time & "]</span> <span style='color:#a5d6ff;'>" & sRecord & "</span></div>"
+        currentHtml = LogWindow.Document.getElementById("logContent").innerHTML
+        LogWindow.Document.getElementById("logContent").innerHTML = logHtml & currentHtml
+    End If
+    
+   
+End Sub
+
+UpdateMonitor "等待操作", "请将鼠标移至投注软件并按回车键(Enter)", "脚本已启动"
+MessageBox "【第一步】请将鼠标移动到你要操作的投注软件窗口内，然后按【回车键】(Enter) 锁定该窗口。"
 Do
-    If IsRunning = True Then
-        Call CheckAPI()
-        
-        ' 获取界面上设置的轮询间隔
-        Dim intervalSec
-        intervalSec = CInt(Form1.InpInterval.Text)
-        If intervalSec < 5 Then intervalSec = 5 ' 最低5秒
-        
-        ' 每次检查完等待。为了防止界面卡死，分成多次1秒的延时
-        Dim i
-        For i = 1 To intervalSec
-            If IsRunning = False Then Exit For
-            Delay 1000
-        Next
-    Else
-        Delay 1000
+    Dim key
+    key = WaitKey()
+    If key = 13 Then 
+        Hwnd = Plugin.Window.MousePoint()
+        UpdateMonitor "正常运行", "等待网页端新指令...", "已成功锁定窗口句柄: " & Hwnd
+        Exit Do
     End If
 Loop
 
-' --- 检查API并执行下注 ---
-Sub CheckAPI()
-    Dim Http, Ret, loopPeriod, loopNumbers, loopStep, currentUrl
-    Set Http = CreateObject("MSXML2.ServerXMLHTTP")
-    currentUrl = Form1.InpServerURL.Text
-    If currentUrl = "" Then currentUrl = "http://127.0.0.1:3000/api/recommendation"
-    
-    On Error Resume Next 
+' --- 2. 主循环 (通过API获取数据并操作) ---
+Dim Http, Ret, loopPeriod, loopNumbers, loopStep
+Set Http = CreateObject("MSXML2.ServerXMLHTTP")
+
+On Error Resume Next 
+
+Do
     Err.Clear 
-    Http.open "GET", currentUrl & "?t=" & Timer, False
+    ' 添加时间戳防止 XMLHTTP 缓存导致数据不更新
+    Http.open "GET", ServerURL & "?t=" & Timer, False
     Http.Send
-    If Err.Number <> 0 Then
-        Call AddLog("【网络错误】无法连接到网页端，请检查接口地址是否正确，或确认本地网页端已开启。")
-        Call AddLog("当前尝试连接的地址: " & currentUrl)
-        Exit Sub
-    End If
-    
-    If Http.Status = 200 Then
+    If Err.Number = 0 Then
         Ret = Http.responseText
+        
         If InStr(Ret, """period""") > 0 Then
             loopPeriod = Split(Split(Ret, """period"":""")(1), """")(0)
             
@@ -276,36 +260,36 @@ Sub CheckAPI()
             loopNumbers = Split(Split(Ret, """numbers"":[")(1), "]")(0)
             loopNumbers = Replace(loopNumbers, ",", " ")
             
+            ' 1. 对比期数，保证下注不会重复
+            ' 2. 检查轮次是否有效 (1-6轮)
             If loopPeriod <> "" And loopPeriod <> LastBetPeriod And loopStep >= 1 And loopStep <= 6 Then
-                Form1.LblPeriod.Caption = loopPeriod
-                Form1.LblStep.Caption = "第 " & CStr(loopStep) & " 轮"
-                Call AddLog("获取到新期号: " & loopPeriod & ", 轮次: " & loopStep)
+                UpdateMonitor "接收指令", "准备执行下注流程", "获取到新期号: " & loopPeriod & ", 轮次: " & loopStep
+                
                 Call PlaceBet(Hwnd, loopNumbers, loopStep)
                 LastBetPeriod = loopPeriod
-                Call AddLog("期号 " & loopPeriod & " 下注完毕，等待下期")
-                Form1.LblStatus.Caption = "等待下期"
+                
+                UpdateMonitor "正常运行", "等待下一期...", "期号 " & loopPeriod & " 下注流程完毕"
             ElseIf loopPeriod = LastBetPeriod Then
-                Form1.LblStatus.Caption = "等待新期号"
+                UpdateMonitor "正常运行", "等待新期号...", "当前期号 " & loopPeriod & " 已下注，等待更新"
             End If
         End If
-    ElseIf Http.Status = 404 Then
-        Form1.LblStatus.Caption = "等待网页端出号"
     Else
-        Call AddLog("【网络异常】服务器返回状态码: " & Http.Status)
-        Form1.LblStatus.Caption = "网络异常"
+        UpdateMonitor "网络异常", "连接失败", "无法连接到: " & ServerURL
     End If
-End Sub
+    ' 每30秒自动获取一次
+    Delay 30000 
+Loop
 
 ' --- 辅助函数: 获取对应轮次的金额 ---
 Function GetBetAmount(stepNum)
     Dim amt
-    If CInt(stepNum) = 1 Then amt = Form1.InpStep1.Text
-    If CInt(stepNum) = 2 Then amt = Form1.InpStep2.Text
-    If CInt(stepNum) = 3 Then amt = Form1.InpStep3.Text
-    If CInt(stepNum) = 4 Then amt = Form1.InpStep4.Text
-    If CInt(stepNum) = 5 Then amt = Form1.InpStep5.Text
-    If CInt(stepNum) = 6 Then amt = Form1.InpStep6.Text
-    If CInt(stepNum) < 1 Or CInt(stepNum) > 6 Then amt = Form1.InpStep1.Text
+    If CInt(stepNum) = 1 Then amt = BetStep1
+    If CInt(stepNum) = 2 Then amt = BetStep2
+    If CInt(stepNum) = 3 Then amt = BetStep3
+    If CInt(stepNum) = 4 Then amt = BetStep4
+    If CInt(stepNum) = 5 Then amt = BetStep5
+    If CInt(stepNum) = 6 Then amt = BetStep6
+    If CInt(stepNum) < 1 Or CInt(stepNum) > 6 Then amt = BetStep1
     GetBetAmount = CInt(amt)
 End Function
 
@@ -343,15 +327,12 @@ End Function
 
 ' --- 辅助函数: 安全点击 (支持前台和后台) ---
 Sub SafeClick(coordStr, handle)
-    Dim coords, x, y, mode
+    Dim coords, x, y
     coords = Split(coordStr, ",")
-    mode = CInt(Form1.InpClickMode.Text)
-    If mode <> 1 And mode <> 2 Then mode = 1 ' 默认前台
-    
     If UBound(coords) >= 1 Then
         x = CInt(coords(0))
         y = CInt(coords(1))
-        If mode = 1 Then
+        If CInt(ClickMode) = 1 Then
             MoveTo x, y
             Delay 80
             LeftClick 1
@@ -365,23 +346,21 @@ End Sub
 
 ' --- 子程序: 后台下注流程 ---
 Sub PlaceBet(handle, numbersStr, stepNum)
-    Dim BetAmount, mode
+    Dim BetAmount
     BetAmount = GetBetAmount(stepNum)
-    mode = CInt(Form1.InpClickMode.Text)
-    If mode <> 1 And mode <> 2 Then mode = 1
 
-    If mode = 1 Then
-        Call AddLog("正在激活窗口(前台)...")
+    If CInt(ClickMode) = 1 Then
+        UpdateMonitor "执行下注", "正在激活窗口(前台)...", "开始第 " & stepNum & " 轮, 倍数: " & BetAmount
         Call Plugin.Window.Restore(handle)
         Call Plugin.Window.Active(handle)
         Delay 800
     Else
-        Call AddLog("准备后台点击...")
+        UpdateMonitor "执行下注", "准备后台点击...", "开始第 " & stepNum & " 轮, 倍数: " & BetAmount
         Delay 300
     End If
 
     ' 1. 选中推荐号码
-    Call AddLog("正在选中推荐号码: " & numbersStr)
+    UpdateMonitor "执行下注", "正在选中推荐号码...", "点击号码: " & numbersStr
     Dim arrNumbers, num
     arrNumbers = Split(numbersStr, " ")
     For Each num In arrNumbers
@@ -392,15 +371,17 @@ Sub PlaceBet(handle, numbersStr, stepNum)
     Next
     
     ' 2. 点击“倍数”输入框，唤出小键盘
+    UpdateMonitor "执行下注", "正在唤出小键盘...", "点击倍数输入框"
     Call SafeClick(AmountInputCoord, handle)
     Delay 600 
     
     ' 3. 点击小键盘“清零”
+    UpdateMonitor "执行下注", "正在清零倍数...", "点击清零"
     Call SafeClick(KeyClearCoord, handle)
     Delay 300
     
     ' 4. 拆分金额数字并在小键盘上依次点击
-    Call AddLog("正在输入倍数: " & BetAmount)
+    UpdateMonitor "执行下注", "正在输入倍数: " & BetAmount, "输入倍数: " & BetAmount
     Dim amountStr, i, digit
     amountStr = CStr(BetAmount)
     For i = 1 To Len(amountStr)
@@ -410,16 +391,594 @@ Sub PlaceBet(handle, numbersStr, stepNum)
     Next
     
     ' 5. 点击小键盘“确认”
+    UpdateMonitor "执行下注", "确认倍数...", "点击确认"
     Call SafeClick(KeyConfirmCoord, handle)
     Delay 500
     
     ' 6. 点击“立即投注”
-    Call AddLog("点击立即投注")
+    UpdateMonitor "执行下注", "点击立即投注...", "点击立即投注"
     Call SafeClick(SubmitBetCoord, handle)
     Delay 500
     
 End Sub
 `;
+
+  const autoAhkScriptContent = `#Requires AutoHotkey v2.0
+#SingleInstance Force
+
+; 解决 DPI 缩放导致的坐标不准问题 (强制物理像素模式)
+try DllCall("SetThreadDpiAwarenessContext", "ptr", -3, "ptr")
+
+; ==============================================================================
+; 请求管理员权限 (雷电模拟器必须以管理员身份运行脚本才能点击)
+; ==============================================================================
+if not A_IsAdmin
+{
+    try {
+        Run '*RunAs "' A_ScriptFullPath '"'
+    }
+    ExitApp
+}
+
+; ==============================================================================
+; 开奖大师 - AutoHotkey 全自动投注脚本 (v22.0 兼容版)
+; ==============================================================================
+
+; ==============================================================================
+; 配置区域 (Configuration)
+; ==============================================================================
+global ServerURL := "请在此处填入您的网页地址/api/recommendation"
+global ClickMode := 1 ; 1=前台(Foreground), 2=后台(Background)
+
+; 坐标配置 (完全同步自您的按键精灵脚本)
+global Coords := Map()
+Coords["Num1"] := [829, 481]
+Coords["Num2"] := [925, 485]
+Coords["Num3"] := [1024, 483]
+Coords["Num4"] := [1123, 475]
+Coords["Num5"] := [1198, 479]
+Coords["Num6"] := [828, 573]
+Coords["Num7"] := [921, 574]
+Coords["Num8"] := [1037, 580]
+Coords["Num9"] := [1101, 575]
+Coords["Num10"] := [1209, 594]
+
+Coords["AmountInput"] := [1049, 836]
+Coords["SubmitBet"] := [1174, 999]
+
+Coords["KeyClear"] := [1203, 730]
+Coords["KeyConfirm"] := [1215, 824]
+Coords["Key0"] := [944, 842]
+Coords["Key1"] := [785, 626]
+Coords["Key2"] := [942, 630]
+Coords["Key3"] := [1084, 630]
+Coords["Key4"] := [799, 700]
+Coords["Key5"] := [951, 695]
+Coords["Key6"] := [1086, 695]
+Coords["Key7"] := [781, 769]
+Coords["Key8"] := [932, 773]
+Coords["Key9"] := [1073, 767]
+
+; 倍投策略 (6轮)
+global BetSteps := [10, 20, 40, 80, 160, 320]
+
+; ==============================================================================
+; 全局变量 (Global Variables)
+; ==============================================================================
+global TargetHwnd := 0
+global LastBetPeriod := ""
+global IsRunning := false
+
+; ==============================================================================
+; 图形界面 (GUI)
+; ==============================================================================
+MyGui := Gui(, "开奖大师 - AutoHotkey版")
+MyGui.SetFont("s9", "Microsoft YaHei")
+
+MyGui.Add("Text", "x10 y15 w80", "接口地址:")
+MyGui.Add("Edit", "x90 y12 w300 vServerURL", ServerURL)
+
+MyGui.Add("Text", "x10 y45 w80", "点击模式:")
+MyGui.Add("DropDownList", "x90 y42 w100 vClickMode Choose1", ["前台点击", "后台点击"])
+
+MyGui.Add("GroupBox", "x10 y80 w430 h60", "控制")
+MyGui.Add("Button", "x20 y100 w100 vBtnBind", "1. 绑定窗口").OnEvent("Click", BindWindow)
+MyGui.Add("Button", "x130 y100 w100 vBtnTest", "测试点击").OnEvent("Click", TestClick)
+MyGui.Add("Text", "x240 y105 w180 vLblStatus cBlue", "状态: 未绑定")
+
+MyGui.Add("Button", "x20 y150 w100 vBtnStart", "2. 启动脚本").OnEvent("Click", StartScript)
+MyGui.Add("Button", "x130 y150 w100 vBtnStop", "3. 停止脚本").OnEvent("Click", StopScript)
+MyGui.Add("Button", "x240 y150 w100 vBtnConfig", "坐标配置").OnEvent("Click", OpenConfig)
+MyGui["BtnStop"].Enabled := false
+
+MyGui.Add("Text", "x10 y190 w380", "运行日志:")
+global LogEdit := MyGui.Add("Edit", "x10 y210 w430 h300 ReadOnly vLogOutput")
+
+MyGui.OnEvent("Close", (*) => ExitApp())
+MyGui.Show("w450 h530")
+
+; ==============================================================================
+; 坐标配置窗口 (Coordinate Configuration GUI)
+; ==============================================================================
+OpenConfig(*)
+{
+    ConfigGui := Gui("+Owner" MyGui.Hwnd, "坐标配置 - 请确保已绑定窗口")
+    ConfigGui.SetFont("s9", "Microsoft YaHei")
+    
+    ConfigGui.Add("Text", "x10 y10 w400 cGray", "提示: 点击'抓取'后，将鼠标移至目标位置按 F8 即可自动填入。")
+    
+    ; --- 存档管理区域 ---
+    ConfigGui.Add("GroupBox", "x320 y40 w120 h160", "存档管理")
+    ProfileDDL := ConfigGui.Add("DropDownList", "x330 y65 w100 Choose1", ["存档 1", "存档 2", "存档 3", "存档 4", "存档 5"])
+    ConfigGui.Add("Button", "x330 y100 w100", "保存到存档").OnEvent("Click", (*) => DoSaveProfile(ProfileDDL.Value))
+    ConfigGui.Add("Button", "x330 y135 w100", "从存档加载").OnEvent("Click", (*) => DoLoadProfile(ProfileDDL.Value))
+    ConfigGui.Add("Text", "x330 y175 w100 cGray", "存档保存在\`nProfiles.ini")
+    ; --------------------
+
+    ; 定义显示名称映射
+    Names := Map()
+    Names["Num1"] := "号码 01", Names["Num2"] := "号码 02", Names["Num3"] := "号码 03", Names["Num4"] := "号码 04", Names["Num5"] := "号码 05"
+    Names["Num6"] := "号码 06", Names["Num7"] := "号码 07", Names["Num8"] := "号码 08", Names["Num9"] := "号码 09", Names["Num10"] := "号码 10"
+    Names["AmountInput"] := "倍数输入框", Names["SubmitBet"] := "立即投注按钮"
+    Names["KeyClear"] := "键盘-清零", Names["KeyConfirm"] := "键盘-确认"
+    Names["Key0"] := "键盘-0", Names["Key1"] := "键盘-1", Names["Key2"] := "键盘-2", Names["Key3"] := "键盘-3", Names["Key4"] := "键盘-4"
+    Names["Key5"] := "键盘-5", Names["Key6"] := "键盘-6", Names["Key7"] := "键盘-7", Names["Key8"] := "键盘-8", Names["Key9"] := "键盘-9"
+
+    yPos := 40
+    ConfigGui.SetFont("bold")
+    ConfigGui.Add("Text", "x10 y" yPos " w100", "按钮名称")
+    ConfigGui.Add("Text", "x120 y" yPos " w120", "当前坐标 (X, Y)")
+    ConfigGui.SetFont("norm")
+    yPos += 25
+
+    ; 遍历坐标 Map 创建编辑框
+    Edits := Map()
+    for key, val in Coords {
+        displayName := Names.Has(key) ? Names[key] : key
+        ConfigGui.Add("Text", "x10 y" yPos " w100", displayName ":")
+        Edits[key] := ConfigGui.Add("Edit", "x120 y" yPos-3 " w120", val[1] ", " val[2])
+        
+        ; 闭包处理抓取按钮
+        currentKey := key
+        ConfigGui.Add("Button", "x250 y" (yPos-5) " w60", "抓取").OnEvent("Click", ((k, e, *) => CaptureSpecific(k, e)).Bind(currentKey, Edits[key]))
+        
+        yPos += 30
+    }
+
+    ConfigGui.Add("Button", "x120 y" (yPos+10) " w100 Default", "保存配置").OnEvent("Click", SaveConfig)
+    ConfigGui.Show("w460")
+
+    DoSaveProfile(idx) {
+        iniFile := A_ScriptDir "\Profiles.ini"
+        section := "Profile" idx
+        for key, editCtrl in Edits {
+            IniWrite(editCtrl.Value, iniFile, section, key)
+        }
+        ToolTip "已保存到存档 " idx
+        SetTimer () => ToolTip(), -2000
+    }
+
+    DoLoadProfile(idx) {
+        iniFile := A_ScriptDir "\Profiles.ini"
+        section := "Profile" idx
+        try {
+            ; 检查存档是否存在
+            IniRead(iniFile, section, "Num1")
+        } catch {
+            MsgBox "该存档为空或不存在！", "提示"
+            return
+        }
+        
+        for key, editCtrl in Edits {
+            try {
+                val := IniRead(iniFile, section, key)
+                editCtrl.Value := val
+            }
+        }
+        ToolTip "已加载存档 " idx
+        SetTimer () => ToolTip(), -2000
+    }
+
+    CaptureSpecific(key, editCtrl) {
+        if (TargetHwnd == 0) {
+            MsgBox "请先在主界面绑定窗口！"
+            return
+        }
+        MsgBox "请将鼠标移至 [" Names[key] "] 位置，然后按 F8 键抓取坐标。", "抓取提示", "Iconi T3"
+        
+        ; 临时重定向 F8
+        HotKey "F8", (*) => DoCapture(key, editCtrl), "On"
+    }
+
+    DoCapture(key, editCtrl) {
+        if (!WinExist("ahk_id " TargetHwnd)) {
+            ToolTip "错误：目标窗口已失效"
+            return
+        }
+        ; 确保窗口在抓取时是激活的，这样 Client 坐标才准确
+        WinActivate "ahk_id " TargetHwnd
+        WinWaitActive "ahk_id " TargetHwnd,, 1
+        
+        CoordMode "Mouse", "Client"
+        MouseGetPos &x, &y
+        editCtrl.Value := x ", " y
+        ToolTip "已抓取 " Names[key] ": " x ", " y
+        SetTimer () => ToolTip(), -2000
+        HotKey "F8", "Off" ; 抓取一次后关闭
+    }
+
+    SaveConfig(*) {
+        for key, editCtrl in Edits {
+            parts := StrSplit(editCtrl.Value, [",", " ", ";"])
+            cleanParts := []
+            for p in parts {
+                if (IsNumber(Trim(p)))
+                    cleanParts.Push(Number(Trim(p)))
+            }
+            if (cleanParts.Length == 2) {
+                Coords[key] := [cleanParts[1], cleanParts[2]]
+            }
+        }
+        AddLog("坐标配置已更新。")
+        ConfigGui.Destroy()
+    }
+}
+
+; ==============================================================================
+; 核心逻辑 (Core Logic)
+; ==============================================================================
+
+; 启动时尝试加载存档 1
+try {
+    iniFile := A_ScriptDir "\Profiles.ini"
+    if FileExist(iniFile) {
+        for key, val in Coords {
+            str := IniRead(iniFile, "Profile1", key, "")
+            if (str != "") {
+                parts := StrSplit(str, [",", " ", ";"])
+                if (parts.Length >= 2)
+                    Coords[key] := [Number(Trim(parts[1])), Number(Trim(parts[2]))]
+            }
+        }
+    }
+}
+
+; 测试点击功能
+TestClick(*)
+{
+    global TargetHwnd
+    if (TargetHwnd == 0) {
+        MsgBox "请先绑定窗口！"
+        return
+    }
+    mode := MyGui["ClickMode"].Text
+    AddLog("正在测试点击 [号码 01]...")
+    SafeClick(Coords["Num1"], TargetHwnd, mode)
+    AddLog("测试指令已发送")
+}
+
+BindWindow(*)
+{
+    global TargetHwnd
+    AddLog("请将鼠标移至游戏窗口内，按【回车键】(Enter) 绑定...")
+    
+    ; 注册 Enter 键热键，仅触发一次
+    HotKey "Enter", CaptureWindow, "On"
+}
+
+CaptureWindow(*)
+{
+    global TargetHwnd
+    MouseGetPos ,, &TargetHwnd
+    HotKey "Enter", CaptureWindow, "Off" ; 关闭热键
+    
+    if (TargetHwnd) {
+        try {
+            Title := WinGetTitle("ahk_id " TargetHwnd)
+            MyGui["LblStatus"].Text := "已绑定: " SubStr(Title, 1, 15) "..."
+            MyGui["LblStatus"].Opt("cGreen")
+            AddLog("绑定成功! 句柄: " TargetHwnd " 标题: " Title)
+        } catch {
+            AddLog("绑定成功，但无法获取标题。句柄: " TargetHwnd)
+            MyGui["LblStatus"].Text := "已绑定: (无标题)"
+        }
+    } else {
+        AddLog("绑定失败，未获取到窗口句柄")
+    }
+}
+
+StartScript(*)
+{
+    global IsRunning, TargetHwnd
+    if (!TargetHwnd) {
+        MsgBox("请先绑定游戏窗口！", "错误", "Icon!")
+        return
+    }
+    
+    IsRunning := true
+    MyGui["BtnStart"].Enabled := false
+    MyGui["BtnStop"].Enabled := true
+    MyGui["BtnBind"].Enabled := false
+    
+    AddLog("脚本已启动，开始监听网页端指令...")
+    SetTimer CheckAPI, 15000 ; 每15秒检查一次
+    CheckAPI() ; 立即运行一次
+}
+
+StopScript(*)
+{
+    global IsRunning
+    IsRunning := false
+    MyGui["BtnStart"].Enabled := true
+    MyGui["BtnStop"].Enabled := false
+    MyGui["BtnBind"].Enabled := true
+    
+    SetTimer CheckAPI, 0 ; 关闭定时器
+    AddLog("脚本已停止。")
+}
+
+CheckAPI()
+{
+    global ServerURL, LastBetPeriod, BetSteps, TargetHwnd, IsRunning
+    
+    if (!IsRunning)
+        return
+
+    savedURL := MyGui["ServerURL"].Value
+    
+    try {
+        whr := ComObject("WinHttp.WinHttpRequest.5.1")
+        whr.SetTimeouts(2000, 2000, 2000, 5000) ; Resolve, Connect, Send, Receive timeouts
+        whr.Open("GET", savedURL "?t=" A_TickCount, true) ; Async=true
+        whr.Send()
+        
+        ; Wait for response with timeout (5 seconds)
+        if (whr.WaitForResponse(5) == 0) { ; 0 = Timeout
+            AddLog("连接超时 (5s) - 正在重试...")
+            return
+        }
+        
+        if (whr.Status != 200) {
+            AddLog("网络错误: 状态码 " whr.Status)
+            return
+        }
+        
+        Ret := whr.ResponseText
+        
+        ; 使用最简单的字符串查找来解析 JSON
+        loopPeriod := ""
+        loopStep := 0
+        loopNumbersStr := ""
+        
+        ; 解析 period
+        pos1 := InStr(Ret, '"period":"')
+        if (pos1 > 0) {
+            pos1 += 10
+            pos2 := InStr(Ret, '"',, pos1)
+            if (pos2 > 0)
+                loopPeriod := SubStr(Ret, pos1, pos2 - pos1)
+        }
+        
+        ; 解析 step
+        pos1 := InStr(Ret, '"step":')
+        if (pos1 > 0) {
+            pos1 += 7
+            ; 找到下一个逗号或右大括号
+            pos2 := InStr(Ret, ",",, pos1)
+            pos3 := InStr(Ret, "}",, pos1)
+            
+            endPos := 0
+            if (pos2 > 0 && pos3 > 0)
+                endPos := Min(pos2, pos3)
+            else if (pos2 > 0)
+                endPos := pos2
+            else if (pos3 > 0)
+                endPos := pos3
+                
+            if (endPos > 0) {
+                stepStr := Trim(SubStr(Ret, pos1, endPos - pos1), " \`t\`r\`n\`"")
+                if IsNumber(stepStr)
+                    loopStep := Integer(stepStr)
+            }
+        }
+        
+        ; 解析 numbers
+        pos1 := InStr(Ret, '"numbers":[')
+        if (pos1 > 0) {
+            pos1 += 11
+            pos2 := InStr(Ret, "]",, pos1)
+            if (pos2 > 0) {
+                nums := SubStr(Ret, pos1, pos2 - pos1)
+                loopNumbersStr := StrReplace(nums, ",", " ")
+                loopNumbersStr := StrReplace(loopNumbersStr, '"', "")
+            }
+        }
+        
+        if (loopPeriod != "" && loopPeriod != LastBetPeriod && loopStep >= 1 && loopStep <= 6) {
+            AddLog(">>> 获取新指令: " loopPeriod " 期, 第 " loopStep " 轮")
+            
+            PlaceBet(TargetHwnd, loopNumbersStr, loopStep)
+            
+            LastBetPeriod := loopPeriod
+            AddLog("<<< 期号 " loopPeriod " 下注完成，等待下期")
+        } else {
+            ; 无论是否有新号，都记录心跳日志，确保用户知道程序在运行
+            curStatus := (loopPeriod != "") ? "当前期号: " loopPeriod : "等待数据..."
+            
+            ; 调试信息：如果期号变了但没下注，说明 Step 解析失败或范围不对
+            if (loopPeriod != "" && loopPeriod != LastBetPeriod) {
+                AddLog("警告: 检测到新期号但未下注! 解析Step: " loopStep)
+                AddLog("调试数据: " Ret)
+            }
+            
+            AddLog("运行正常: 监听中... (" curStatus ")")
+        }
+        
+    } catch as err {
+        AddLog("请求失败: " err.Message)
+    }
+}
+
+PlaceBet(hwnd, numbersStr, stepNum)
+{
+    global BetSteps, Coords
+    
+    betAmount := BetSteps[stepNum]
+    mode := MyGui["ClickMode"].Value ; 1=Foreground, 2=Background
+    
+    if (mode == "前台点击") {
+        AddLog("激活窗口(前台)...")
+        try {
+            WinActivate "ahk_id " hwnd
+            WinWaitActive "ahk_id " hwnd,, 2
+        }
+        Sleep 800
+    } else {
+        AddLog("准备后台点击...")
+        Sleep 300
+    }
+    
+    ; 1. 选中推荐号码
+    AddLog("选中号码: " numbersStr)
+    nums := StrSplit(numbersStr, " ")
+    for n in nums {
+        n := Trim(n)
+        if IsNumber(n) {
+            if (Coords.Has("Num" n)) {
+                SafeClick(Coords["Num" n], hwnd, mode)
+                Sleep 150
+            }
+        }
+    }
+    
+    ; 2. 点击“倍数”输入框
+    SafeClick(Coords["AmountInput"], hwnd, mode)
+    Sleep 600 
+    
+    ; 3. 点击小键盘“清零”
+    SafeClick(Coords["KeyClear"], hwnd, mode)
+    Sleep 300
+    
+    ; 4. 输入倍数
+    AddLog("输入倍数: " betAmount)
+    amountStr := String(betAmount)
+    Loop Parse, amountStr {
+        digit := A_LoopField
+        if (Coords.Has("Key" digit)) {
+            SafeClick(Coords["Key" digit], hwnd, mode)
+            Sleep 200
+        }
+    }
+    
+    ; 5. 点击小键盘“确认”
+    SafeClick(Coords["KeyConfirm"], hwnd, mode)
+    Sleep 500
+    
+    ; 6. 点击“立即投注”
+    AddLog("点击立即投注")
+    SafeClick(Coords["SubmitBet"], hwnd, mode)
+    Sleep 500
+}
+
+SafeClick(coord, hwnd, mode)
+{
+    x := coord[1]
+    y := coord[2]
+    
+    if (!WinExist("ahk_id " hwnd)) {
+        AddLog("错误：目标窗口不存在")
+        return
+    }
+
+    ; 1. 强制激活并置顶窗口
+    WinActivate "ahk_id " hwnd
+    WinWaitActive "ahk_id " hwnd,, 1
+
+    if (mode == "前台点击") {
+        ; 切换到客户区坐标系 (Client)，这通常与按键精灵坐标一致
+        CoordMode "Mouse", "Client"
+        SetDefaultMouseSpeed 5
+        
+        ; 移动前显示目标提示
+        ToolTip "目标坐标: " x ", " y " (客户区模式)"
+        SetTimer () => ToolTip(), -2000
+        
+        ; 移动鼠标并停留
+        MouseMove x, y
+        Sleep 200
+        
+        ; 模拟真实触控：按下 -> 停留 -> 抬起
+        Click "Down"
+        Sleep 200 ; 模拟器识别触控通常需要 >150ms 的停留
+        Click "Up"
+        Sleep 100
+    } else {
+        try {
+            ; 后台点击尝试 (后台通常也基于客户区)
+            ControlClick "x" x " y" y, "ahk_id " hwnd,,,, "NA"
+            Sleep 200
+        }
+    }
+}
+
+AddLog(msg)
+{
+    timestamp := FormatTime(, "HH:mm:ss")
+    currentLog := "[" timestamp "] " msg "\`r\`n" LogEdit.Value
+    
+    ; 只保留最新的 30 行日志
+    linePos := 0
+    Loop 30 {
+        linePos := InStr(currentLog, "\`n",, linePos + 1)
+        if (linePos == 0)
+            break
+    }
+    
+    if (linePos > 0)
+        currentLog := SubStr(currentLog, 1, linePos)
+        
+    try {
+        LogEdit.Value := currentLog
+    }
+}
+
+; ==============================================================================
+; 辅助工具：按 F8 获取当前鼠标坐标 (客户区模式 - 推荐用于模拟器)
+; ==============================================================================
+F8::
+{
+    CoordMode "Mouse", "Client"
+    MouseGetPos &x, &y
+    posStr := "[" x ", " y "]"
+    A_Clipboard := posStr
+    ToolTip "已复制客户区坐标: " posStr "\`n(最适合模拟器)"
+    SetTimer () => ToolTip(), -2000
+}
+
+; ==============================================================================
+; 辅助工具：按 F7 锁定当前活动窗口为操作目标
+; ==============================================================================
+F7::
+{
+    global TargetHwnd := WinExist("A")
+    title := WinGetTitle("ahk_id " TargetHwnd)
+    AddLog("已手动锁定目标窗口: " title " (ID: " TargetHwnd ")")
+    ToolTip "已锁定窗口: " title
+    SetTimer () => ToolTip(), -2000
+}
+`;
+
+  const handleDownloadAhkScript = () => {
+    const blob = new Blob([autoAhkScriptContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'AutoBetScript.ahk';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const handleDownloadScript = () => {
     const blob = new Blob([autoElfScriptContent], { type: 'text/plain;charset=utf-8' });
@@ -1258,7 +1817,7 @@ End Sub
                 <div className="bg-white/50 p-4 rounded border border-gray-200">
                   <h3 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
                     <GitCompare size={14} className="text-emerald-600"/>
-                    当前选号逻辑 (v20.0)
+                    当前选号逻辑 (v21.0 6轮倍投版)
                   </h3>
                   <div className="text-[11px] font-mono text-gray-600 space-y-1.5 leading-relaxed">
                     <p>定位：取【最新1期】冠军号码，看它在【倒数第47期】排第几名(N)。</p>
@@ -1269,6 +1828,7 @@ End Sub
                       <p>• 若 N=6~9 (右半区) → 取第 2, 3, 4, 5 名</p>
                     </div>
                     <p className="text-gray-400 italic mt-1">* 数据源自倒数第46期</p>
+                    <p className="text-blue-600 font-bold mt-2">策略：6轮倍投 (1-2-4-8-16-32)</p>
                   </div>
                 </div>
 
@@ -1350,12 +1910,33 @@ End Sub
                         <Download size={12} />
                         下载新版脚本
                       </button>
+                      <button onClick={handleDownloadAhkScript} className="text-xs font-mono uppercase bg-[#141414] text-[#E4E3E0] px-3 py-1 hover:bg-emerald-600 transition-colors flex items-center gap-2 ml-2">
+                        <Download size={12} />
+                        下载 AHK 脚本
+                      </button>
                     </div>
                     <div className="text-[11px] font-mono text-gray-500 pt-2 space-y-1">
-                      <p>1. 在按键精灵中新建一个脚本，点击<strong className="text-[#141414]">【界面】</strong>选项卡。</p>
-                      <p>2. 按照脚本顶部的注释说明，添加对应的<strong className="text-[#141414]">【标签】、【按钮】和【输入框】</strong>，并修改它们的<strong className="text-[#141414]">【名称】</strong>属性。</p>
-                      <p>3. 点击上方按钮下载脚本，并全部粘贴到<strong className="text-[#141414]">【源码】</strong>选项卡中。</p>
-                      <p>4. 运行脚本，您将看到自己设计的高级控制终端！</p>
+                      <p>1. <strong>按键精灵用户：</strong>点击“下载新版脚本”，在按键精灵中新建脚本，按照代码顶部的注释说明设置界面，然后粘贴源码。</p>
+                      <p>2. <strong>AutoHotkey用户：</strong>点击“下载 AHK 脚本”，安装 AutoHotkey v2 后直接运行即可。</p>
+                      <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="font-bold text-yellow-800 mb-1">⚠️ 信号稳定性提示：</p>
+                        <p className="text-yellow-700">请确保在 AHK 脚本的“接口地址”中填入以下地址：</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <code className="bg-white px-2 py-1 rounded border border-yellow-300 text-yellow-900 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                            {window.location.origin}/api/recommendation
+                          </code>
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${window.location.origin}/api/recommendation`);
+                              alert('接口地址已复制！请粘贴到 AHK 脚本中。');
+                            }}
+                            className="bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700 transition-colors"
+                          >
+                            复制
+                          </button>
+                        </div>
+                        <p className="mt-2 text-yellow-700">注意：请务必开启上面的“启用按键精灵自动下注”开关，否则接口将不会更新数据。</p>
+                      </div>
                     </div>
                   </div>
                 </div>

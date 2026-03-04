@@ -40,12 +40,13 @@ async function startServer() {
 
   app.use(express.json());
 
-  // API for the script to get the latest recommendation (legacy, keeping for compatibility if needed)
+  // API for the script to get the latest recommendation
   app.get("/api/recommendation", (req, res) => {
     if (latestRecommendation) {
       res.json(latestRecommendation);
     } else {
-      res.status(404).json({ error: "No recommendation available yet" });
+      // Return 200 with a null/empty state instead of 404 to keep the script connection "stable"
+      res.json({ period: "", numbers: [], step: 0, message: "Waiting for recommendation..." });
     }
   });
 
