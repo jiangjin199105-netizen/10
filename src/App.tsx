@@ -427,7 +427,7 @@ if not A_IsAdmin
 ; ==============================================================================
 ; 配置区域 (Configuration)
 ; ==============================================================================
-global ServerURL := "请在此处填入您的网页地址/api/recommendation"
+global ServerURL := "http://localhost:3000/api/recommendation"
 global ClickMode := 1 ; 1=前台(Foreground), 2=后台(Background)
 
 ; 坐标配置 (完全同步自您的按键精灵脚本)
@@ -882,7 +882,7 @@ PlaceBet(hwnd, numbersStr, stepNum)
     global BetSteps, Coords
     
     betAmount := BetSteps[stepNum]
-    mode := MyGui["ClickMode"].Value ; 1=Foreground, 2=Background
+    mode := MyGui["ClickMode"].Text ; 获取选中的文本，例如 "前台点击"
     
     if (mode == "前台点击") {
         AddLog("激活窗口(前台)...")
