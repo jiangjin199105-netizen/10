@@ -17,31 +17,28 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
+:: Run deep check
+if exist "check_env.js" (
+    node check_env.js
+    if %errorlevel% neq 0 (
+        echo.
+        echo [警告] 环境检查未通过，尝试自动修复...
+        call npm install
+        node check_env.js
+        if %errorlevel% neq 0 (
+            echo [错误] 自动修复失败。请手动运行“重新安装依赖.bat”。
+            pause
+            exit /b
+        )
+    )
+)
+
 :: Check .env
 if not exist ".env" (
     if exist ".env.example" (
         copy .env.example .env >nul
         echo [信息] 已创建默认的 .env 配置文件。
     )
-)
-
-:: Check if node_modules exists and express is installed
-if not exist "node_modules\express" (
-    echo [警告] 发现依赖组件不完整或未安装。
-    echo [信息] 正在安装必要的组件，这可能需要 1-3 分钟，请稍候...
-    call npm install
-    if %errorlevel% neq 0 (
-        echo.
-        echo [错误] 依赖组件安装失败！
-        echo 可能的原因：
-        echo 1. 网络连接不稳定 (建议尝试切换手机热点)
-        echo 2. 权限不足 (请尝试右键“以管理员身份运行”此脚本)
-        echo.
-        echo 如果持续失败，请运行“重新安装依赖.bat”
-        pause
-        exit /b
-    )
-    echo [成功] 依赖组件安装完成。
 )
 
 :: Start browser opener in background
