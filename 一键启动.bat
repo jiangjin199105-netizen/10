@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 chcp 65001 >nul
 title 开奖大师 - 全自动投注系统 (v22.0 兼容版)
 
@@ -10,7 +11,7 @@ echo [提示] 正在检查运行环境...
 
 :: Check Node.js
 where node >nul 2>nul
-if %errorlevel% neq 0 (
+if !errorlevel! neq 0 (
     echo [错误] 未找到 Node.js 环境！
     echo 请前往 https://nodejs.org/ 下载并安装 Node.js (推荐 LTS 版本)
     pause
@@ -20,12 +21,12 @@ if %errorlevel% neq 0 (
 :: Run deep check
 if exist "check_env.js" (
     node check_env.js
-    if %errorlevel% neq 0 (
+    if !errorlevel! neq 0 (
         echo.
         echo [警告] 环境检查未通过，尝试自动修复...
         call npm install
         node check_env.js
-        if %errorlevel% neq 0 (
+        if !errorlevel! neq 0 (
             echo [错误] 自动修复失败。请手动运行“重新安装依赖.bat”。
             pause
             exit /b
@@ -67,7 +68,7 @@ echo.
 :: Run dev server
 call npm run dev
 
-if %errorlevel% neq 0 (
+if !errorlevel! neq 0 (
     echo.
     echo [错误] 服务器启动失败。
     echo 如果看到 "ERR_MODULE_NOT_FOUND"，请运行“重新安装依赖.bat”。
