@@ -1,47 +1,58 @@
 @echo off
-chcp 65001 >nul
-title 开奖大师 - 一键启动
+title Lottery Master - Start
 
 echo ==========================================
-echo 开奖大师 - 一键启动
+echo Lottery Master - Start
 echo ==========================================
 echo.
 
-:: 检查 Node.js
+:: 1. Check Node.js
 node -v >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [错误] 未检测到 Node.js，请先安装 Node.js v20+。
+    echo [ERROR] Node.js not found.
+    echo Please install Node.js v18 or higher.
+    echo Download: https://nodejs.org/
     pause
     exit /b
 )
 
-:: 检查是否需要强制重装
-set /p reinstall="是否需要强制重新安装依赖？(输入 y 并回车确认，直接回车跳过): "
+:: 2. Check package.json
+if not exist "package.json" (
+    echo [ERROR] package.json not found.
+    echo Please run this script in the correct folder.
+    pause
+    exit /b
+)
+
+:: 3. Ask for reinstall
+set /p reinstall="Force reinstall dependencies? (y/n, default n): "
 if /i "%reinstall%"=="y" (
-    echo [提示] 正在清理旧文件...
+    echo [INFO] Cleaning old files...
     if exist node_modules rd /s /q node_modules
     if exist package-lock.json del /f /q package-lock.json
-    echo [提示] 正在重新安装依赖...
+    echo [INFO] Reinstalling dependencies...
     call npm cache clean --force
     call npm install --registry=https://registry.npmmirror.com
 ) else (
     if not exist "node_modules" (
-        echo [提示] 首次运行，正在安装依赖...
+        echo [INFO] First run, installing dependencies...
         call npm install --registry=https://registry.npmmirror.com
     )
 )
 
 echo.
-echo [提示] 正在启动服务器...
-echo [提示] 浏览器将自动打开，请勿关闭此黑窗口！
+echo [INFO] Starting server...
+echo [INFO] Browser will open automatically. Do not close this window!
 echo.
 
+:: 4. Start browser
 start http://localhost:3000
+
+:: 5. Start server
 call npm run dev
 
-if %errorlevel% neq 0 (
-    echo.
-    echo [错误] 服务器异常退出。
-    echo 如果是因为依赖损坏，请重新运行本脚本并输入 y 重装依赖。
-    pause
-)
+:: 6. If server exits, pause to see error
+echo.
+echo [ERROR] Server exited unexpectedly.
+echo If dependencies are corrupted, run this script again and type 'y' to reinstall.
+pause
