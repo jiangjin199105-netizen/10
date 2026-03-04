@@ -1,54 +1,74 @@
 @echo off
 setlocal enabledelayedexpansion
 chcp 65001 >nul
-title 开奖大师 - 全自动投注系统 (v22.0 兼容版)
+title 开奖大师 - 极速启动器 (免配置版)
 
 echo ========================================================
-echo          开奖大师 - 全自动投注系统 (v22.0 兼容版)
+echo          开奖大师 - 极速启动器 (免配置版)
 echo ========================================================
 echo.
-echo [提示] 正在检查运行环境...
 
-:: Check Node.js
+:: 1. 检查 Node.js
 node -v >nul 2>&1
 if !errorlevel! neq 0 (
-    echo [错误] 未找到 Node.js 环境！
-    echo.
-    echo 可能的原因：
-    echo 1. 您还没有安装 Node.js。
-    echo 2. 您刚刚安装完 Node.js，但还没有重启电脑或重新打开文件夹。
-    echo.
-    echo 请前往 https://nodejs.org/ 下载并安装 Node.js (推荐 LTS 版本)
-    echo 如果已经安装，请尝试【重启电脑】后再运行。
-    pause
-    exit /b
-)
-
-:: Check NPM
-call npm -v >nul 2>&1
-if !errorlevel! neq 0 (
-    echo [错误] 未找到 npm 环境！
-    echo 这通常随 Node.js 一起安装。请尝试重新安装 Node.js。
-    pause
-    exit /b
-)
-
-:: Run deep check
-if exist "check_env.cjs" (
-    node check_env.cjs
+    echo [提示] 正在为您进行首次运行的环境初始化...
+    echo [信息] 正在检查系统组件，请稍候 (约 10-30 秒)...
+    
+    :: 尝试使用内置的 npm 修复 (如果用户安装了 node 但没加 PATH)
+    set "PATH=%PATH%;%ProgramFiles%\nodejs\;%AppData%\npm"
+    node -v >nul 2>&1
     if !errorlevel! neq 0 (
         echo.
-        echo [警告] 环境检查未通过，正在尝试自动安装依赖...
-        echo 这可能需要几分钟，请不要关闭窗口。
-        call npm install
-        node check_env.cjs
-        if !errorlevel! neq 0 (
-            echo [错误] 自动修复失败。请手动运行“重新安装依赖.bat”。
-            pause
-            exit /b
-        )
+        echo [错误] 未检测到 Node.js 环境。
+        echo ----------------------------------------------------
+        echo 极简部署方案：
+        echo 1. 请前往 https://nodejs.org/ 下载安装包 (LTS版本)。
+        echo 2. 安装时一路点击 "Next" 即可。
+        echo 3. 安装完后【重启电脑】再打开本脚本。
+        echo ----------------------------------------------------
+        pause
+        exit /b
     )
 )
+
+:: 2. 检查依赖库 (node_modules)
+if not exist "node_modules" (
+    echo [信息] 首次运行，正在自动下载必要组件 (仅需一次)...
+    echo [注意] 请保持网络畅通，下载过程约 1 分钟...
+    call npm install --quiet
+    if !errorlevel! neq 0 (
+        echo [错误] 组件下载失败，请检查网络或运行“重新安装依赖.bat”。
+        pause
+        exit /b
+    )
+    echo [成功] 组件安装完成！
+)
+
+:: 3. 自动创建配置文件
+if not exist ".env" (
+    if exist ".env.example" (
+        copy .env.example .env >nul
+    )
+)
+
+:: 4. 启动后台浏览器开启器
+echo @echo off > _opener.bat
+echo :LOOP >> _opener.bat
+echo timeout /t 2 ^>nul >> _opener.bat
+echo netstat -an ^| find "3000" ^| find "LISTENING" ^>nul >> _opener.bat
+echo if %%errorlevel%% neq 0 goto LOOP >> _opener.bat
+echo start http://localhost:3000 >> _opener.bat
+echo del _opener.bat >> _opener.bat
+echo exit >> _opener.bat
+start /min cmd /c _opener.bat
+
+echo [信息] 正在启动程序...
+echo [提示] 启动后浏览器会自动打开，请勿关闭此黑窗口。
+echo.
+
+:: 5. 运行程序
+call npm run dev
+pause
 
 :: Check .env
 if not exist ".env" (
