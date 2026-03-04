@@ -155,6 +155,7 @@ UserVar Key6Coord="1086,695" "【键盘】数字 6 坐标"
 UserVar Key7Coord="781,769" "【键盘】数字 7 坐标"
 UserVar Key8Coord="932,773" "【键盘】数字 8 坐标"
 UserVar Key9Coord="1073,767" "【键盘】数字 9 坐标"
+UserVar KeyReturnCoord="1215,900" "【键盘】'返回'按钮坐标"
 
 UserVar BetStep1=1 "【策略】第1轮倍数"
 UserVar BetStep2=2 "【策略】第2轮倍数"
@@ -400,6 +401,11 @@ Sub PlaceBet(handle, numbersStr, stepNum)
     Call SafeClick(SubmitBetCoord, handle)
     Delay 500
     
+    ' 7. 点击“返回”
+    UpdateMonitor "执行下注", "点击返回...", "点击返回"
+    Call SafeClick(KeyReturnCoord, handle)
+    Delay 500
+    
 End Sub
 `;
 
@@ -443,7 +449,7 @@ Coords["KeyClear"] := [1203, 730, 1]
 Coords["KeyConfirm"] := [1215, 824, 1]
 Coords["Key0"] := [944, 842, 1], Coords["Key1"] := [785, 626, 1], Coords["Key2"] := [942, 630, 1], Coords["Key3"] := [1084, 630, 1]
 Coords["Key4"] := [799, 700, 1], Coords["Key5"] := [951, 695, 1], Coords["Key6"] := [1086, 695, 1], Coords["Key7"] := [781, 769, 1]
-Coords["Key8"] := [932, 773, 1], Coords["Key9"] := [1073, 767, 1]
+Coords["Key8"] := [932, 773, 1], Coords["Key9"] := [1073, 767, 1], Coords["KeyReturn"] := [1215, 900, 1]
 
 ; 倍投策略 (6轮)
 global BetSteps := [10, 20, 40, 80, 160, 320]
@@ -512,7 +518,7 @@ OpenConfig(*)
     Names["AmountInput"] := "倍数输入框", Names["SubmitBet"] := "立即投注按钮"
     Names["KeyClear"] := "键盘-清零", Names["KeyConfirm"] := "键盘-确认"
     Names["Key0"] := "键盘-0", Names["Key1"] := "键盘-1", Names["Key2"] := "键盘-2", Names["Key3"] := "键盘-3", Names["Key4"] := "键盘-4"
-    Names["Key5"] := "键盘-5", Names["Key6"] := "键盘-6", Names["Key7"] := "键盘-7", Names["Key8"] := "键盘-8", Names["Key9"] := "键盘-9"
+    Names["Key5"] := "键盘-5", Names["Key6"] := "键盘-6", Names["Key7"] := "键盘-7", Names["Key8"] := "键盘-8", Names["Key9"] := "键盘-9", Names["KeyReturn"] := "键盘-返回"
 
     Edits := Map()
     Modes := Map()
@@ -555,7 +561,7 @@ OpenConfig(*)
     ; --- 第三列：虚拟键盘 (仅点击模式需要) ---
     ConfigGui.Add("GroupBox", "x310 y150 w290 h230", "3. 虚拟键盘坐标 (仅点击模式必填)")
     yPos := 175
-    keyboardKeys := ["Key1", "Key2", "Key3", "Key4", "Key5", "Key6", "Key7", "Key8", "Key9", "Key0", "KeyClear", "KeyConfirm"]
+    keyboardKeys := ["Key1", "Key2", "Key3", "Key4", "Key5", "Key6", "Key7", "Key8", "Key9", "Key0", "KeyClear", "KeyConfirm", "KeyReturn"]
     
     ; 使用两列排版键盘
     Loop keyboardKeys.Length {
@@ -947,6 +953,11 @@ PlaceBet(hwnd, numbersStr, stepNum)
     ; 6. 点击“立即投注”
     AddLog("点击立即投注")
     SafeClick(Coords["SubmitBet"], hwnd, mode)
+    Sleep 500
+    
+    ; 7. 点击“返回”
+    AddLog("点击返回")
+    SafeClick(Coords["KeyReturn"], hwnd, mode)
     Sleep 500
 }
 
