@@ -1,9 +1,9 @@
 @echo off
 chcp 65001 >nul
-title 开奖大师 - 全自动投注系统 (v21.0 6轮倍投版)
+title 开奖大师 - 全自动投注系统 (v22.0 兼容版)
 
 echo ========================================================
-echo          开奖大师 - 全自动投注系统 (v21.0 6轮倍投版)
+echo          开奖大师 - 全自动投注系统 (v22.0 兼容版)
 echo ========================================================
 echo.
 echo [提示] 正在检查运行环境...
@@ -12,7 +12,7 @@ echo [提示] 正在检查运行环境...
 where node >nul 2>nul
 if %errorlevel% neq 0 (
     echo [错误] 未找到 Node.js 环境！
-    echo 请前往 https://nodejs.org/ 下载并安装 Node.js
+    echo 请前往 https://nodejs.org/ 下载并安装 Node.js (推荐 LTS 版本)
     pause
     exit /b
 )
@@ -25,15 +25,23 @@ if not exist ".env" (
     )
 )
 
-:: Install dependencies if missing
-if not exist "node_modules" (
-    echo [信息] 首次运行，正在安装必要的依赖组件，请稍候...
+:: Check if node_modules exists and express is installed
+if not exist "node_modules\express" (
+    echo [警告] 发现依赖组件不完整或未安装。
+    echo [信息] 正在安装必要的组件，这可能需要 1-3 分钟，请稍候...
     call npm install
     if %errorlevel% neq 0 (
-        echo [错误] 依赖组件安装失败，请检查网络后重试。
+        echo.
+        echo [错误] 依赖组件安装失败！
+        echo 可能的原因：
+        echo 1. 网络连接不稳定 (建议尝试切换手机热点)
+        echo 2. 权限不足 (请尝试右键“以管理员身份运行”此脚本)
+        echo.
+        echo 如果持续失败，请运行“重新安装依赖.bat”
         pause
         exit /b
     )
+    echo [成功] 依赖组件安装完成。
 )
 
 :: Start browser opener in background
@@ -52,14 +60,21 @@ echo [信息] 启动成功后，浏览器将自动打开主页。
 echo [注意] 请不要关闭本黑底白字的命令行窗口！
 echo.
 echo [使用说明]
-echo 1. 网页打开后，点击右上角【设置】获取最新按键精灵代码。
-echo 2. 在按键精灵中新建脚本，按照代码顶部的说明画好界面。
-echo 3. 将代码复制到按键精灵【源码】中运行即可。
-echo 4. 如果遇到网络错误，请检查按键精灵界面上的【接口地址】是否为 http://127.0.0.1:3000/api/recommendation
+echo 1. 网页打开后，点击右上角【设置】。
+echo 2. 勾选“启用按键精灵自动下注”，并复制下方的“接口地址”。
+echo 3. 运行 AHK 脚本，在“接口地址”中粘贴刚才复制的地址。
+echo 4. 如果遇到 ERR_MODULE_NOT_FOUND 错误，请先运行“重新安装依赖.bat”。
 echo ========================================================
 echo.
 
 :: Run dev server
 call npm run dev
+
+if %errorlevel% neq 0 (
+    echo.
+    echo [错误] 服务器启动失败。
+    echo 如果看到 "ERR_MODULE_NOT_FOUND"，请运行“重新安装依赖.bat”。
+    pause
+)
 
 pause
