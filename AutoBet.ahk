@@ -24,33 +24,19 @@ global ServerURL := "请在此处填入您的网页地址/api/recommendation"
 global ClickMode := 1 ; 1=前台(Foreground), 2=后台(Background)
 
 ; 坐标配置 (完全同步自您的按键精灵脚本)
+; 格式: [X, Y, 模式] (模式: 1=点击, 2=输入)
 global Coords := Map()
-Coords["Num1"] := [829, 481]
-Coords["Num2"] := [925, 485]
-Coords["Num3"] := [1024, 483]
-Coords["Num4"] := [1123, 475]
-Coords["Num5"] := [1198, 479]
-Coords["Num6"] := [828, 573]
-Coords["Num7"] := [921, 574]
-Coords["Num8"] := [1037, 580]
-Coords["Num9"] := [1101, 575]
-Coords["Num10"] := [1209, 594]
+Coords["Num1"] := [829, 481, 1], Coords["Num2"] := [925, 485, 1], Coords["Num3"] := [1024, 483, 1], Coords["Num4"] := [1123, 475, 1], Coords["Num5"] := [1198, 479, 1]
+Coords["Num6"] := [828, 573, 1], Coords["Num7"] := [921, 574, 1], Coords["Num8"] := [1037, 580, 1], Coords["Num9"] := [1101, 575, 1], Coords["Num10"] := [1209, 594, 1]
 
-Coords["AmountInput"] := [1049, 836]
-Coords["SubmitBet"] := [1174, 999]
+Coords["AmountInput"] := [1049, 836, 1] ; 默认点击模式，可选输入模式
+Coords["SubmitBet"] := [1174, 999, 1]
 
-Coords["KeyClear"] := [1203, 730]
-Coords["KeyConfirm"] := [1215, 824]
-Coords["Key0"] := [944, 842]
-Coords["Key1"] := [785, 626]
-Coords["Key2"] := [942, 630]
-Coords["Key3"] := [1084, 630]
-Coords["Key4"] := [799, 700]
-Coords["Key5"] := [951, 695]
-Coords["Key6"] := [1086, 695]
-Coords["Key7"] := [781, 769]
-Coords["Key8"] := [932, 773]
-Coords["Key9"] := [1073, 767]
+Coords["KeyClear"] := [1203, 730, 1]
+Coords["KeyConfirm"] := [1215, 824, 1]
+Coords["Key0"] := [944, 842, 1], Coords["Key1"] := [785, 626, 1], Coords["Key2"] := [942, 630, 1], Coords["Key3"] := [1084, 630, 1]
+Coords["Key4"] := [799, 700, 1], Coords["Key5"] := [951, 695, 1], Coords["Key6"] := [1086, 695, 1], Coords["Key7"] := [781, 769, 1]
+Coords["Key8"] := [932, 773, 1], Coords["Key9"] := [1073, 767, 1]
 
 ; 倍投策略 (6轮)
 global BetSteps := [10, 20, 40, 80, 160, 320]
@@ -74,6 +60,9 @@ MyGui.Add("Edit", "x90 y12 w300 vServerURL", ServerURL)
 MyGui.Add("Text", "x10 y45 w80", "点击模式:")
 MyGui.Add("DropDownList", "x90 y42 w100 vClickMode Choose1", ["前台点击", "后台点击"])
 
+MyGui.Add("Text", "x210 y45 w80", "金额输入:")
+MyGui.Add("DropDownList", "x290 y42 w100 vInputMode Choose1", ["点击模式", "输入模式"]).OnEvent("Change", SyncInputMode)
+
 MyGui.Add("GroupBox", "x10 y80 w430 h60", "控制")
 MyGui.Add("Button", "x20 y100 w100 vBtnBind", "1. 绑定窗口").OnEvent("Click", BindWindow)
 MyGui.Add("Button", "x130 y100 w100 vBtnTest", "测试点击").OnEvent("Click", TestClick)
@@ -95,17 +84,18 @@ MyGui.Show("w450 h530")
 ; ==============================================================================
 OpenConfig(*)
 {
-    ConfigGui := Gui("+Owner" MyGui.Hwnd, "坐标配置 - 请确保已绑定窗口")
+    local Edits, Modes, Names, ProfileDDL, ConfigGui
+    ConfigGui := Gui("+Owner" MyGui.Hwnd, "坐标配置 - 请根据您的界面类型配置")
     ConfigGui.SetFont("s9", "Microsoft YaHei")
     
-    ConfigGui.Add("Text", "x10 y10 w400 cGray", "提示: 点击'抓取'后，将鼠标移至目标位置按 F8 即可自动填入。")
+    ConfigGui.Add("Text", "x10 y10 w600 cGray", "提示: 点击'抓取'后，将鼠标移至目标位置按 F8 即可自动填入。输入模式下，键盘坐标可不填。")
     
     ; --- 存档管理区域 ---
-    ConfigGui.Add("GroupBox", "x320 y40 w120 h160", "存档管理")
-    ProfileDDL := ConfigGui.Add("DropDownList", "x330 y65 w100 Choose1", ["存档 1", "存档 2", "存档 3", "存档 4", "存档 5"])
-    ConfigGui.Add("Button", "x330 y100 w100", "保存到存档").OnEvent("Click", (*) => DoSaveProfile(ProfileDDL.Value))
-    ConfigGui.Add("Button", "x330 y135 w100", "从存档加载").OnEvent("Click", (*) => DoLoadProfile(ProfileDDL.Value))
-    ConfigGui.Add("Text", "x330 y175 w100 cGray", "存档保存在`nProfiles.ini")
+    ConfigGui.Add("GroupBox", "x620 y40 w120 h160", "存档管理")
+    ProfileDDL := ConfigGui.Add("DropDownList", "x630 y65 w100 Choose1", ["存档 1", "存档 2", "存档 3", "存档 4", "存档 5"])
+    ConfigGui.Add("Button", "x630 y100 w100", "保存到存档").OnEvent("Click", (*) => DoSaveProfile(ProfileDDL.Value))
+    ConfigGui.Add("Button", "x630 y135 w100", "从存档加载").OnEvent("Click", (*) => DoLoadProfile(ProfileDDL.Value))
+    ConfigGui.Add("Text", "x630 y175 w100 cGray", "存档保存在`nProfiles.ini")
     ; --------------------
 
     ; 定义显示名称映射
@@ -117,38 +107,75 @@ OpenConfig(*)
     Names["Key0"] := "键盘-0", Names["Key1"] := "键盘-1", Names["Key2"] := "键盘-2", Names["Key3"] := "键盘-3", Names["Key4"] := "键盘-4"
     Names["Key5"] := "键盘-5", Names["Key6"] := "键盘-6", Names["Key7"] := "键盘-7", Names["Key8"] := "键盘-8", Names["Key9"] := "键盘-9"
 
-    yPos := 40
-    ConfigGui.SetFont("bold")
-    ConfigGui.Add("Text", "x10 y" yPos " w100", "按钮名称")
-    ConfigGui.Add("Text", "x120 y" yPos " w120", "当前坐标 (X, Y)")
-    ConfigGui.SetFont("norm")
-    yPos += 25
-
-    ; 遍历坐标 Map 创建编辑框
     Edits := Map()
-    for key, val in Coords {
-        displayName := Names.Has(key) ? Names[key] : key
-        ConfigGui.Add("Text", "x10 y" yPos " w100", displayName ":")
-        Edits[key] := ConfigGui.Add("Edit", "x120 y" yPos-3 " w120", val[1] ", " val[2])
+    Modes := Map()
+
+    ; --- 第一列：号码配置 ---
+    ConfigGui.Add("GroupBox", "x10 y40 w290 h340", "1. 号码选择坐标 (必填)")
+    yPos := 65
+    Loop 10 {
+        key := "Num" A_Index
+        val := Coords[key]
+        ConfigGui.Add("Text", "x20 y" yPos " w60", Names[key] ":")
+        Edits[key] := ConfigGui.Add("Edit", "x85 y" yPos-3 " w80", val[1] ", " val[2])
         
-        ; 闭包处理抓取按钮
         currentKey := key
-        ConfigGui.Add("Button", "x250 y" (yPos-5) " w60", "抓取").OnEvent("Click", ((k, e, *) => CaptureSpecific(k, e)).Bind(currentKey, Edits[key]))
-        
+        ConfigGui.Add("Button", "x170 y" (yPos-5) " w40", "抓取").OnEvent("Click", ((k, e, *) => CaptureSpecific(k, e)).Bind(currentKey, Edits[key]))
+        ConfigGui.Add("Text", "x220 y" yPos " w60 cGray", "点击")
         yPos += 30
-        if (yPos > 550) { ; 如果太长，另起一列
-            ; 这里简单处理，实际可能需要滚动条或分页，但目前按钮不多
-        }
     }
 
-    ConfigGui.Add("Button", "x120 y" (yPos+10) " w100 Default", "保存配置").OnEvent("Click", SaveConfig)
-    ConfigGui.Show("w460")
+    ; --- 第二列：下注控制 ---
+    ConfigGui.Add("GroupBox", "x310 y40 w290 h100", "2. 下注动作坐标 (必填)")
+    yPos := 65
+    ; 倍数输入框
+    key := "AmountInput"
+    val := Coords[key]
+    ConfigGui.Add("Text", "x320 y" yPos " w70", Names[key] ":")
+    Edits[key] := ConfigGui.Add("Edit", "x395 y" yPos-3 " w80", val[1] ", " val[2])
+    Modes[key] := ConfigGui.Add("DropDownList", "x480 y" yPos-3 " w50 Choose" val[3], ["点击", "输入"])
+    ConfigGui.Add("Button", "x540 y" (yPos-5) " w40", "抓取").OnEvent("Click", ((k, e, *) => CaptureSpecific(k, e)).Bind(key, Edits[key]))
+    
+    yPos += 35
+    ; 立即投注
+    key := "SubmitBet"
+    val := Coords[key]
+    ConfigGui.Add("Text", "x320 y" yPos " w70", Names[key] ":")
+    Edits[key] := ConfigGui.Add("Edit", "x395 y" yPos-3 " w80", val[1] ", " val[2])
+    ConfigGui.Add("Button", "x480 y" (yPos-5) " w40", "抓取").OnEvent("Click", ((k, e, *) => CaptureSpecific(k, e)).Bind(key, Edits[key]))
+    ConfigGui.Add("Text", "x530 y" yPos " w60 cGray", "点击")
+
+    ; --- 第三列：虚拟键盘 (仅点击模式需要) ---
+    ConfigGui.Add("GroupBox", "x310 y150 w290 h230", "3. 虚拟键盘坐标 (仅点击模式必填)")
+    yPos := 175
+    keyboardKeys := ["Key1", "Key2", "Key3", "Key4", "Key5", "Key6", "Key7", "Key8", "Key9", "Key0", "KeyClear", "KeyConfirm"]
+    
+    ; 使用两列排版键盘
+    Loop keyboardKeys.Length {
+        key := keyboardKeys[A_Index]
+        val := Coords[key]
+        
+        ; 计算行列
+        col := (A_Index-1) // 6
+        row := Mod(A_Index-1, 6)
+        
+        curX := 320 + (col * 145)
+        curY := 175 + (row * 30)
+        
+        ConfigGui.Add("Text", "x" curX " y" curY " w60", Names[key] ":")
+        Edits[key] := ConfigGui.Add("Edit", "x" (curX+55) " y" (curY-3) " w50", val[1] ", " val[2])
+        ConfigGui.Add("Button", "x" (curX+110) " y" (curY-5) " w30", "抓").OnEvent("Click", ((k, e, *) => CaptureSpecific(k, e)).Bind(key, Edits[key]))
+    }
+
+    ConfigGui.Add("Button", "x310 y400 w150 h40 Default", "保存并应用配置").OnEvent("Click", SaveConfig)
+    ConfigGui.Show("w750 h460")
 
     DoSaveProfile(idx) {
         iniFile := A_ScriptDir "\Profiles.ini"
         section := "Profile" idx
         for key, editCtrl in Edits {
             IniWrite(editCtrl.Value, iniFile, section, key)
+            IniWrite(Modes[key].Value, iniFile, section, key "_mode")
         }
         ToolTip "已保存到存档 " idx
         SetTimer () => ToolTip(), -2000
@@ -169,6 +196,13 @@ OpenConfig(*)
             try {
                 val := IniRead(iniFile, section, key)
                 editCtrl.Value := val
+                modeVal := IniRead(iniFile, section, key "_mode", "1")
+                Modes[key].Value := Number(modeVal)
+                
+                ; 如果是金额输入框，同步到主界面
+                if (key == "AmountInput") {
+                    MyGui["InputMode"].Value := Number(modeVal)
+                }
             }
         }
         ToolTip "已加载存档 " idx
@@ -213,12 +247,24 @@ OpenConfig(*)
                     cleanParts.Push(Number(Trim(p)))
             }
             if (cleanParts.Length == 2) {
-                Coords[key] := [cleanParts[1], cleanParts[2]]
+                mode := Modes.Has(key) ? Modes[key].Value : 1
+                Coords[key] := [cleanParts[1], cleanParts[2], mode]
+                
+                ; 如果是金额输入框，同步到主界面
+                if (key == "AmountInput") {
+                    MyGui["InputMode"].Value := mode
+                }
             }
         }
         AddLog("坐标配置已更新。")
         ConfigGui.Destroy()
     }
+}
+
+SyncInputMode(*) {
+    global Coords
+    Coords["AmountInput"][3] := MyGui["InputMode"].Value
+    AddLog("金额输入模式已切换为: " MyGui["InputMode"].Text)
 }
 
 ; ==============================================================================
@@ -233,8 +279,17 @@ try {
             str := IniRead(iniFile, "Profile1", key, "")
             if (str != "") {
                 parts := StrSplit(str, [",", " ", ";"])
-                if (parts.Length >= 2)
-                    Coords[key] := [Number(Trim(parts[1])), Number(Trim(parts[2]))]
+                if (parts.Length >= 2) {
+                    x := Number(Trim(parts[1]))
+                    y := Number(Trim(parts[2]))
+                    modeVal := IniRead(iniFile, "Profile1", key "_mode", "1")
+                    Coords[key] := [x, y, Number(modeVal)]
+                    
+                    ; 如果是金额输入框，同步到主界面
+                    if (key == "AmountInput") {
+                        MyGui["InputMode"].Value := Number(modeVal)
+                    }
+                }
             }
         }
     }
@@ -449,27 +504,39 @@ PlaceBet(hwnd, numbersStr, stepNum)
     }
     
     ; 2. 点击“倍数”输入框
-    SafeClick(Coords["AmountInput"], hwnd, mode)
-    Sleep 600 
-    
-    ; 3. 点击小键盘“清零”
-    SafeClick(Coords["KeyClear"], hwnd, mode)
-    Sleep 300
-    
-    ; 4. 输入倍数
-    AddLog("输入倍数: " betAmount)
-    amountStr := String(betAmount)
-    Loop Parse, amountStr {
-        digit := A_LoopField
-        if (Coords.Has("Key" digit)) {
-            SafeClick(Coords["Key" digit], hwnd, mode)
-            Sleep 200
+    inputCoord := Coords["AmountInput"]
+    if (inputCoord[3] == 2) { ; 输入模式 (直接键盘输入)
+        AddLog(">>> 模式: 直接键盘输入 (倍数: " betAmount ")")
+        SafeType(inputCoord, hwnd, mode, String(betAmount))
+        Sleep 800
+    } else {
+        ; 点击模式 (使用虚拟键盘坐标)
+        AddLog(">>> 模式: 虚拟键盘点击 (倍数: " betAmount ")")
+        SafeClick(inputCoord, hwnd, mode)
+        Sleep 800 
+        
+        ; 3. 点击小键盘“清零”
+        if (Coords.Has("KeyClear")) {
+            SafeClick(Coords["KeyClear"], hwnd, mode)
+            Sleep 400
+        }
+        
+        ; 4. 输入倍数
+        amountStr := String(betAmount)
+        Loop Parse, amountStr {
+            digit := A_LoopField
+            if (Coords.Has("Key" digit)) {
+                SafeClick(Coords["Key" digit], hwnd, mode)
+                Sleep 250
+            }
+        }
+        
+        ; 5. 点击小键盘“确认”
+        if (Coords.Has("KeyConfirm")) {
+            SafeClick(Coords["KeyConfirm"], hwnd, mode)
+            Sleep 600
         }
     }
-    
-    ; 5. 点击小键盘“确认”
-    SafeClick(Coords["KeyConfirm"], hwnd, mode)
-    Sleep 500
     
     ; 6. 点击“立即投注”
     AddLog("点击立即投注")
@@ -515,6 +582,44 @@ SafeClick(coord, hwnd, mode)
             ControlClick "x" x " y" y, "ahk_id " hwnd,,,, "NA"
             Sleep 200
         }
+    }
+}
+
+SafeType(coord, hwnd, mode, text)
+{
+    ; 如果设置了坐标，则先点击聚焦输入框
+    if (coord[1] > 0 && coord[2] > 0) {
+        SafeClick(coord, hwnd, mode)
+        Sleep 500
+    }
+    
+    if (mode == "前台点击") {
+        ; 确保窗口激活
+        WinActivate "ahk_id " hwnd
+        
+        ; 全选并删除旧内容 (兼容大部分输入框)
+        Send "^a"
+        Sleep 200
+        Send "{BackSpace}"
+        Sleep 200
+        
+        ; 逐字输入，提高兼容性
+        Loop Parse, text {
+            Send A_LoopField
+            Sleep 50
+        }
+        
+        Sleep 200
+        Send "{Enter}" ; 发送回车确认
+    } else {
+        ; 后台输入尝试 (使用 ControlSend)
+        ; 先尝试发送全选和退格
+        ControlSend "^a{BackSpace}", , "ahk_id " hwnd
+        Sleep 200
+        ; 发送文本
+        ControlSend text, , "ahk_id " hwnd
+        Sleep 200
+        ControlSend "{Enter}", , "ahk_id " hwnd
     }
 }
 
