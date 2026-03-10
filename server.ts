@@ -7,6 +7,14 @@ import https from "https";
 // Global variable to hold the latest recommendation for the script
 let latestRecommendation: { period: string; numbers: number[]; step: number } | null = null;
 
+// --- Auth & License Management ---
+let authConfig = {
+  password: "JH8251050",
+  expiryTimestamp: Date.now() + (28 * 24 * 60 * 60 * 1000), // Initial 28 days
+  failedAttempts: 0,
+  lockUntil: 0
+};
+
 const httpsAgent = new https.Agent({
   rejectUnauthorized: false,
   keepAlive: true,
@@ -41,8 +49,94 @@ async function startServer() {
 
   app.use(express.json());
 
+  // --- Auth APIs ---
+  app.post("/api/auth/verify", (req, res) => {
+    const { password } = req.body;
+    const now = Date.now();
+
+    // Check if locked
+    if (authConfig.lockUntil > now) {
+      const remaining = Math.ceil((authConfig.lockUntil - now) / (60 * 60 * 1000));
+      return res.status(403).json({ 
+        error: `程序已锁定，请在 ${remaining} 小时后再试。`,
+        locked: true
+      });
+    }
+
+    if (password === authConfig.password) {
+      // Success
+      authConfig.failedAttempts = 0;
+      authConfig.lockUntil = 0;
+      
+      // Add 28 days
+      authConfig.expiryTimestamp = Math.max(authConfig.expiryTimestamp, now) + (28 * 24 * 60 * 60 * 1000);
+      
+      res.json({ 
+        success: true, 
+        expiry: authConfig.expiryTimestamp,
+        message: "验证成功，已增加 28 天使用时间。"
+      });
+    } else {
+      // Failure
+      authConfig.failedAttempts++;
+      if (authConfig.failedAttempts >= 3) {
+        authConfig.lockUntil = now + (24 * 60 * 60 * 1000); // 24 hours lock
+        res.status(403).json({ 
+          error: "密码错误 3 次，程序已锁定 24 小时。",
+          locked: true
+        });
+      } else {
+        res.status(401).json({ 
+          error: `密码错误！剩余尝试次数: ${3 - authConfig.failedAttempts}`,
+          attemptsLeft: 3 - authConfig.failedAttempts
+        });
+      }
+    }
+  });
+
+  app.post("/api/auth/change-password", (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+    if (oldPassword === authConfig.password) {
+      authConfig.password = newPassword;
+      res.json({ success: true, message: "密码修改成功。" });
+    } else {
+      res.status(401).json({ error: "原密码不正确。" });
+    }
+  });
+
+  app.get("/api/auth/status", (req, res) => {
+    const now = Date.now();
+    res.json({
+      isExpired: now > authConfig.expiryTimestamp,
+      expiry: authConfig.expiryTimestamp,
+      isLocked: now < authConfig.lockUntil,
+      lockUntil: authConfig.lockUntil
+    });
+  });
+
+  app.post("/api/auth/extend", (req, res) => {
+    const { password } = req.body;
+    const now = Date.now();
+
+    if (password === authConfig.password) {
+      // Add 7 days (7 * 24 * 60 * 60 * 1000)
+      authConfig.expiryTimestamp = Math.max(authConfig.expiryTimestamp, now) + (7 * 24 * 60 * 60 * 1000);
+      res.json({ 
+        success: true, 
+        expiry: authConfig.expiryTimestamp,
+        message: "续期成功！已增加 7 天使用时间。" 
+      });
+    } else {
+      res.status(401).json({ error: "密码不正确，无法续期。" });
+    }
+  });
+
   // API for the script to get the latest recommendation
   app.get("/api/recommendation", (req, res) => {
+    // Check expiry before serving data
+    if (Date.now() > authConfig.expiryTimestamp) {
+      return res.status(402).json({ error: "软件已过期，请重新登录激活。" });
+    }
     if (latestRecommendation) {
       res.json(latestRecommendation);
     } else {

@@ -39,7 +39,7 @@ Coords["Key4"] := [799, 700, 1], Coords["Key5"] := [951, 695, 1], Coords["Key6"]
 Coords["Key8"] := [932, 773, 1], Coords["Key9"] := [1073, 767, 1], Coords["KeyReturn"] := [1215, 900, 1]
 
 ; 倍投策略 (6轮)
-global BetSteps := [10, 20, 40, 80, 160, 320]
+global BetSteps := [5, 10, 20, 40, 80, 160]
 
 ; ==============================================================================
 ; 全局变量 (Global Variables)
@@ -65,19 +65,150 @@ MyGui.Add("DropDownList", "x290 y42 w100 vInputMode Choose1", ["点击模式", "
 
 MyGui.Add("GroupBox", "x10 y80 w430 h60", "控制")
 MyGui.Add("Button", "x20 y100 w100 vBtnBind", "1. 绑定窗口").OnEvent("Click", BindWindow)
-MyGui.Add("Button", "x130 y100 w100 vBtnTest", "测试点击").OnEvent("Click", TestClick)
-MyGui.Add("Text", "x240 y105 w180 vLblStatus cBlue", "状态: 未绑定")
+MyGui.Add("Button", "x130 y100 w80 vBtnTest", "测试点击").OnEvent("Click", TestClick)
+MyGui.Add("Button", "x220 y100 w80 vBtnTestInput", "测试输入").OnEvent("Click", TestInput)
+MyGui.Add("Text", "x310 y105 w130 vLblStatus cBlue", "状态: 未绑定")
 
 MyGui.Add("Button", "x20 y150 w100 vBtnStart", "2. 启动脚本").OnEvent("Click", StartScript)
 MyGui.Add("Button", "x130 y150 w100 vBtnStop", "3. 停止脚本").OnEvent("Click", StopScript)
 MyGui.Add("Button", "x240 y150 w100 vBtnConfig", "坐标配置").OnEvent("Click", OpenConfig)
+MyGui.Add("Button", "x350 y150 w80 vBtnPass", "修改密码").OnEvent("Click", OpenChangePass)
+MyGui.Add("Button", "x350 y100 w80 vBtnExtend", "增加7天").OnEvent("Click", OpenExtendValidity)
 MyGui["BtnStop"].Enabled := false
 
 MyGui.Add("Text", "x10 y190 w380", "运行日志:")
-global LogEdit := MyGui.Add("Edit", "x10 y210 w430 h300 ReadOnly vLogOutput")
+global LogEdit := MyGui.Add("Edit", "x10 y210 w430 h240 ReadOnly vLogOutput")
+
+MyGui.Add("GroupBox", "x10 y460 w430 h60", "倍投金额配置 (1-6轮)")
+global EditSteps := []
+Loop 6 {
+    EditSteps.Push(MyGui.Add("Edit", "x" (20 + (A_Index-1)*70) " y" 485 " w60 vStep" A_Index, BetSteps[A_Index]))
+}
+MyGui.Add("Button", "x10 y525 w430 h30 vBtnSave", "保存金额配置").OnEvent("Click", SaveBetSteps)
 
 MyGui.OnEvent("Close", (*) => ExitApp())
-MyGui.Show("w450 h530")
+
+; --- 启动时显示登录界面 ---
+ShowLogin()
+
+; ==============================================================================
+; 登录与授权逻辑 (Auth Logic)
+; ==============================================================================
+ShowLogin() {
+    global LoginGui := Gui("+AlwaysOnTop", "软件登录验证")
+    LoginGui.SetFont("s10", "Microsoft YaHei")
+    LoginGui.Add("Text", "w250", "请输入登录密码以激活软件：")
+    global PassEdit := LoginGui.Add("Edit", "w250 Password")
+    BtnLogin := LoginGui.Add("Button", "w250 h40 Default", "登录并激活 (28天)")
+    BtnLogin.OnEvent("Click", ProcessLogin)
+    LoginGui.OnEvent("Close", (*) => ExitApp())
+    LoginGui.Show()
+}
+
+ProcessLogin(*) {
+    pass := PassEdit.Value
+    if (pass == "") {
+        MsgBox "请输入密码！"
+        return
+    }
+    
+    try {
+        whr := ComObject("WinHttp.WinHttpRequest.5.1")
+        ; 从 ServerURL 推导基础地址
+        baseUrl := RegExReplace(ServerURL, "/api/.*", "")
+        whr.Open("POST", baseUrl "/api/auth/verify", false)
+        whr.SetRequestHeader("Content-Type", "application/json")
+        whr.Send('{"password": "' pass '"}')
+        
+        if (whr.Status == 200) {
+            MsgBox "登录成功！已增加 28 天使用时间。", "成功", "Iconi"
+            LoginGui.Destroy()
+            MyGui.Show("w450 h570")
+        } else {
+            errMsg := "登录失败"
+            try {
+                res := whr.ResponseText
+                if InStr(res, "error")
+                    errMsg := RegExReplace(res, '.*"error":"([^"]+)".*', "$1")
+            }
+            MsgBox errMsg, "错误", "Iconx"
+        }
+    } catch as err {
+        MsgBox "连接服务器失败: " err.Message, "网络错误", "Iconx"
+    }
+}
+
+OpenChangePass(*) {
+    CPGui := Gui("+Owner" MyGui.Hwnd, "修改登录密码")
+    CPGui.SetFont("s9", "Microsoft YaHei")
+    CPGui.Add("Text", "w200", "原密码:")
+    oldP := CPGui.Add("Edit", "w200 Password")
+    CPGui.Add("Text", "w200", "新密码:")
+    newP := CPGui.Add("Edit", "w200 Password")
+    
+    CPGui.Add("Button", "w200 h35 Default", "确认修改").OnEvent("Click", (*) => DoChangePass(oldP.Value, newP.Value, CPGui))
+    CPGui.Show()
+}
+
+DoChangePass(old, new, gui) {
+    if (old == "" || new == "") {
+        MsgBox "请填写完整信息！"
+        return
+    }
+    try {
+        whr := ComObject("WinHttp.WinHttpRequest.5.1")
+        baseUrl := RegExReplace(ServerURL, "/api/.*", "")
+        whr.Open("POST", baseUrl "/api/auth/change-password", false)
+        whr.SetRequestHeader("Content-Type", "application/json")
+        whr.Send('{"oldPassword": "' old '", "newPassword": "' new '"}')
+        
+        if (whr.Status == 200) {
+            MsgBox "密码修改成功！", "成功"
+            gui.Destroy()
+        } else {
+            MsgBox "修改失败：原密码错误或服务器异常。", "错误", "Iconx"
+        }
+    } catch as err {
+        MsgBox "连接服务器失败: " err.Message
+    }
+}
+
+OpenExtendValidity(*) {
+    EVGui := Gui("+Owner" MyGui.Hwnd, "增加软件有效期")
+    EVGui.SetFont("s9", "Microsoft YaHei")
+    EVGui.Add("Text", "w200", "请输入授权密码以增加7天:")
+    pass := EVGui.Add("Edit", "w200 Password")
+    
+    EVGui.Add("Button", "w200 h35 Default", "确认增加").OnEvent("Click", (*) => DoExtendValidity(pass.Value, EVGui))
+    EVGui.Show()
+}
+
+DoExtendValidity(pass, gui) {
+    if (pass == "") {
+        MsgBox "请输入密码！"
+        return
+    }
+    try {
+        whr := ComObject("WinHttp.WinHttpRequest.5.1")
+        baseUrl := RegExReplace(ServerURL, "/api/.*", "")
+        whr.Open("POST", baseUrl "/api/auth/extend", false)
+        whr.SetRequestHeader("Content-Type", "application/json")
+        whr.Send('{"password": "' pass '"}')
+        
+        if (whr.Status == 200) {
+            res := whr.ResponseText
+            msg := "续期成功！"
+            if InStr(res, "message")
+                msg := RegExReplace(res, '.*"message":"([^"]+)".*', "$1")
+            MsgBox msg, "成功", "Iconi"
+            gui.Destroy()
+        } else {
+            MsgBox "续期失败：密码错误或服务器异常。", "错误", "Iconx"
+        }
+    } catch as err {
+        MsgBox "连接服务器失败: " err.Message
+    }
+}
 
 ; ==============================================================================
 ; 坐标配置窗口 (Coordinate Configuration GUI)
@@ -199,13 +330,24 @@ OpenConfig(*)
                 modeVal := IniRead(iniFile, section, key "_mode", "1")
                 Modes[key].Value := Number(modeVal)
                 
+                ; 同步到全局 Coords 映射，实现“加载即生效”
+                parts := StrSplit(val, [",", " ", ";"])
+                cleanParts := []
+                for p in parts {
+                    if (IsNumber(Trim(p)))
+                        cleanParts.Push(Number(Trim(p)))
+                }
+                if (cleanParts.Length == 2) {
+                    Coords[key] := [cleanParts[1], cleanParts[2], Number(modeVal)]
+                }
+
                 ; 如果是金额输入框，同步到主界面
                 if (key == "AmountInput") {
                     MyGui["InputMode"].Value := Number(modeVal)
                 }
             }
         }
-        ToolTip "已加载存档 " idx
+        ToolTip "已加载存档 " idx " 并立即生效"
         SetTimer () => ToolTip(), -2000
     }
 
@@ -309,6 +451,19 @@ TestClick(*)
     AddLog("测试指令已发送")
 }
 
+TestInput(*)
+{
+    global TargetHwnd
+    if (TargetHwnd == 0) {
+        MsgBox "请先绑定窗口！"
+        return
+    }
+    mode := MyGui["ClickMode"].Text
+    AddLog("正在测试输入 [倍数输入框] (输入: 88)...")
+    SafeType(Coords["AmountInput"], TargetHwnd, mode, "88")
+    AddLog("测试输入指令已发送")
+}
+
 BindWindow(*)
 {
     global TargetHwnd
@@ -339,13 +494,33 @@ CaptureWindow(*)
     }
 }
 
+SaveBetSteps(*)
+{
+    global BetSteps
+    Loop 6 {
+        val := MyGui["Step" A_Index].Value
+        if IsNumber(val)
+            BetSteps[A_Index] := Number(val)
+    }
+    AddLog("倍投金额配置已保存: [" BetSteps[1] ", " BetSteps[2] ", " BetSteps[3] ", " BetSteps[4] ", " BetSteps[5] ", " BetSteps[6] "]")
+    MsgBox "倍投金额配置已保存！", "成功", "Iconi"
+}
+
 StartScript(*)
 {
-    global IsRunning, TargetHwnd
+    global IsRunning, TargetHwnd, BetSteps
     if (!TargetHwnd) {
         MsgBox("请先绑定游戏窗口！", "错误", "Icon!")
         return
     }
+    
+    ; 同步 GUI 中的倍投金额
+    Loop 6 {
+        val := MyGui["Step" A_Index].Value
+        if IsNumber(val)
+            BetSteps[A_Index] := Number(val)
+    }
+    AddLog("当前倍投序列: [" BetSteps[1] ", " BetSteps[2] ", " BetSteps[3] ", " BetSteps[4] ", " BetSteps[5] ", " BetSteps[6] "]")
     
     IsRunning := true
     MyGui["BtnStart"].Enabled := false
@@ -353,8 +528,7 @@ StartScript(*)
     MyGui["BtnBind"].Enabled := false
     
     AddLog("脚本已启动，开始监听网页端指令...")
-    SetTimer CheckAPI, 15000 ; 每15秒检查一次
-    CheckAPI() ; 立即运行一次
+    SetTimer CheckAPI, 1000 ; 1秒后开始第一次检查
 }
 
 StopScript(*)
@@ -365,13 +539,16 @@ StopScript(*)
     MyGui["BtnStop"].Enabled := false
     MyGui["BtnBind"].Enabled := true
     
-    SetTimer CheckAPI, 0 ; 关闭定时器
+    SetTimer CheckAPI, 0 ; 彻底关闭定时器
     AddLog("脚本已停止。")
 }
 
 CheckAPI()
 {
     global ServerURL, LastBetPeriod, BetSteps, TargetHwnd, IsRunning
+    
+    ; 1. 立即停止定时器，防止在下注过程中触发第二次检查
+    SetTimer CheckAPI, 0
     
     if (!IsRunning)
         return
@@ -380,27 +557,32 @@ CheckAPI()
     
     try {
         whr := ComObject("WinHttp.WinHttpRequest.5.1")
-        whr.SetTimeouts(2000, 2000, 2000, 5000) ; Resolve, Connect, Send, Receive timeouts
-        whr.Open("GET", savedURL "?t=" A_TickCount, true) ; Async=true
+        whr.SetTimeouts(2000, 2000, 2000, 5000)
+        whr.Open("GET", savedURL "?t=" A_TickCount, true)
         whr.Send()
         
-        ; Wait for response with timeout (5 seconds)
-        if (whr.WaitForResponse(5) == 0) { ; 0 = Timeout
-            AddLog("连接超时 (5s) - 正在重试...")
+        if (whr.WaitForResponse(5) == 0) {
+            AddLog("连接超时 (5s) - 稍后重试...")
+            if (IsRunning)
+                SetTimer CheckAPI, 5000 ; 超时后5秒重试
             return
         }
         
         if (whr.Status != 200) {
+            if (whr.Status == 402) {
+                AddLog("软件已过期，请重新登录激活！")
+                StopScript()
+                MsgBox "软件已过期，请重新登录激活！", "过期提醒", "Icon!"
+                Reload()
+            }
             AddLog("网络错误: 状态码 " whr.Status)
+            if (IsRunning)
+                SetTimer CheckAPI, 10000 ; 错误后10秒重试
             return
         }
         
         Ret := whr.ResponseText
-        
-        ; 使用最简单的字符串查找来解析 JSON
-        loopPeriod := ""
-        loopStep := 0
-        loopNumbersStr := ""
+        loopPeriod := "", loopStep := 0, loopNumbersStr := ""
         
         ; 解析 period
         pos1 := InStr(Ret, '"period":"')
@@ -415,18 +597,8 @@ CheckAPI()
         pos1 := InStr(Ret, '"step":')
         if (pos1 > 0) {
             pos1 += 7
-            ; 找到下一个逗号或右大括号
-            pos2 := InStr(Ret, ",",, pos1)
-            pos3 := InStr(Ret, "}",, pos1)
-            
-            endPos := 0
-            if (pos2 > 0 && pos3 > 0)
-                endPos := Min(pos2, pos3)
-            else if (pos2 > 0)
-                endPos := pos2
-            else if (pos3 > 0)
-                endPos := pos3
-                
+            pos2 := InStr(Ret, ",",, pos1), pos3 := InStr(Ret, "}",, pos1)
+            endPos := (pos2 > 0 && pos3 > 0) ? Min(pos2, pos3) : (pos2 > 0 ? pos2 : pos3)
             if (endPos > 0) {
                 stepStr := Trim(SubStr(Ret, pos1, endPos - pos1), " `t`r`n`"")
                 if IsNumber(stepStr)
@@ -447,28 +619,27 @@ CheckAPI()
         }
         
         if (loopPeriod != "" && loopPeriod != LastBetPeriod && loopStep >= 1 && loopStep <= 6) {
-            AddLog(">>> 获取新指令: " loopPeriod " 期, 第 " loopStep " 轮")
+            AddLog(">>> 发现新指令: " loopPeriod " 期, 第 " loopStep " 轮")
             
+            ; 关键：先更新期号，防止下注过程中重复触发
+            LastBetPeriod := loopPeriod
+            
+            ; 执行下注 (这是一个耗时操作)
             PlaceBet(TargetHwnd, loopNumbersStr, loopStep)
             
-            LastBetPeriod := loopPeriod
-            AddLog("<<< 期号 " loopPeriod " 下注完成，等待下期")
+            AddLog("<<< 期号 " loopPeriod " 下注动作执行完毕")
         } else {
-            ; 无论是否有新号，都记录心跳日志，确保用户知道程序在运行
             curStatus := (loopPeriod != "") ? "当前期号: " loopPeriod : "等待数据..."
-            
-            ; 调试信息：如果期号变了但没下注，说明 Step 解析失败或范围不对
-            if (loopPeriod != "" && loopPeriod != LastBetPeriod) {
-                AddLog("警告: 检测到新期号但未下注! 解析Step: " loopStep)
-                AddLog("调试数据: " Ret)
-            }
-            
             AddLog("运行正常: 监听中... (" curStatus ")")
         }
         
     } catch as err {
         AddLog("请求失败: " err.Message)
     }
+    
+    ; 2. 任务彻底结束后，重新开启定时器 (15秒后进行下一次检查)
+    if (IsRunning)
+        SetTimer CheckAPI, 15000
 }
 
 PlaceBet(hwnd, numbersStr, stepNum)
@@ -484,10 +655,10 @@ PlaceBet(hwnd, numbersStr, stepNum)
             WinActivate "ahk_id " hwnd
             WinWaitActive "ahk_id " hwnd,, 2
         }
-        Sleep 800
+        Sleep 1000
     } else {
         AddLog("准备后台点击...")
-        Sleep 300
+        Sleep 1000
     }
     
     ; 1. 选中推荐号码
@@ -498,7 +669,6 @@ PlaceBet(hwnd, numbersStr, stepNum)
         if IsNumber(n) {
             if (Coords.Has("Num" n)) {
                 SafeClick(Coords["Num" n], hwnd, mode)
-                Sleep 150
             }
         }
     }
@@ -508,17 +678,14 @@ PlaceBet(hwnd, numbersStr, stepNum)
     if (inputCoord[3] == 2) { ; 输入模式 (直接键盘输入)
         AddLog(">>> 模式: 直接键盘输入 (倍数: " betAmount ")")
         SafeType(inputCoord, hwnd, mode, String(betAmount))
-        Sleep 800
     } else {
         ; 点击模式 (使用虚拟键盘坐标)
         AddLog(">>> 模式: 虚拟键盘点击 (倍数: " betAmount ")")
         SafeClick(inputCoord, hwnd, mode)
-        Sleep 800 
         
         ; 3. 点击小键盘“清零”
         if (Coords.Has("KeyClear")) {
             SafeClick(Coords["KeyClear"], hwnd, mode)
-            Sleep 400
         }
         
         ; 4. 输入倍数
@@ -527,26 +694,24 @@ PlaceBet(hwnd, numbersStr, stepNum)
             digit := A_LoopField
             if (Coords.Has("Key" digit)) {
                 SafeClick(Coords["Key" digit], hwnd, mode)
-                Sleep 250
             }
         }
         
         ; 5. 点击小键盘“确认”
         if (Coords.Has("KeyConfirm")) {
             SafeClick(Coords["KeyConfirm"], hwnd, mode)
-            Sleep 600
         }
     }
     
     ; 6. 点击“立即投注”
     AddLog("点击立即投注")
     SafeClick(Coords["SubmitBet"], hwnd, mode)
-    Sleep 500
     
     ; 7. 点击“返回”
-    AddLog("点击返回")
-    SafeClick(Coords["KeyReturn"], hwnd, mode)
-    Sleep 500
+    if (Coords.Has("KeyReturn")) {
+        AddLog("点击返回")
+        SafeClick(Coords["KeyReturn"], hwnd, mode)
+    }
 }
 
 SafeClick(coord, hwnd, mode)
@@ -559,12 +724,12 @@ SafeClick(coord, hwnd, mode)
         return
     }
 
-    ; 1. 强制激活并置顶窗口
-    WinActivate "ahk_id " hwnd
-    WinWaitActive "ahk_id " hwnd,, 1
-
     if (mode == "前台点击") {
-        ; 切换到客户区坐标系 (Client)，这通常与按键精灵坐标一致
+        ; 强制激活并置顶窗口
+        WinActivate "ahk_id " hwnd
+        WinWaitActive "ahk_id " hwnd,, 1
+        
+        ; 切换到客户区坐标系 (Client)
         CoordMode "Mouse", "Client"
         SetDefaultMouseSpeed 5
         
@@ -580,51 +745,85 @@ SafeClick(coord, hwnd, mode)
         Click "Down"
         Sleep 200 ; 模拟器识别触控通常需要 >150ms 的停留
         Click "Up"
-        Sleep 100
+        Sleep 1000 ; 每步操作后延迟1秒
     } else {
+        ; --- 增强型后台点击 (针对模拟器优化) ---
         try {
-            ; 后台点击尝试 (后台通常也基于客户区)
-            ControlClick "x" x " y" y, "ahk_id " hwnd,,,, "NA"
-            Sleep 200
+            ; 使用 ControlClick 的坐标模式，NA 参数表示不激活窗口
+            ControlClick("x" x " y" y, "ahk_id " hwnd, , "LEFT", 1, "NA")
+        } catch {
+            ; 如果 ControlClick 失败，回退到底层的同步消息注入
+            lparam := (y << 16) | x
+            SendMessage(0x0201, 1, lparam, , "ahk_id " hwnd) ; WM_LBUTTONDOWN
+            Sleep 50
+            SendMessage(0x0202, 0, lparam, , "ahk_id " hwnd) ; WM_LBUTTONUP
         }
+        Sleep 1000
     }
 }
 
 SafeType(coord, hwnd, mode, text)
 {
-    ; 如果设置了坐标，则先点击聚焦输入框
-    if (coord[1] > 0 && coord[2] > 0) {
-        SafeClick(coord, hwnd, mode)
-        Sleep 500
-    }
-    
     if (mode == "前台点击") {
-        ; 确保窗口激活
-        WinActivate "ahk_id " hwnd
-        
-        ; 全选并删除旧内容 (兼容大部分输入框)
-        Send "^a"
-        Sleep 200
-        Send "{BackSpace}"
-        Sleep 200
-        
-        ; 逐字输入，提高兼容性
-        Loop Parse, text {
-            Send A_LoopField
-            Sleep 50
+        ; --- 前台模式：已验证成功 ---
+        try {
+            WinActivate "ahk_id " hwnd
+            WinWaitActive "ahk_id " hwnd,, 2
         }
         
-        Sleep 200
-        Send "{Enter}" ; 发送回车确认
+        if (coord[1] > 0 && coord[2] > 0) {
+            AddLog("前台聚焦: " coord[1] ", " coord[2])
+            SafeClick(coord, hwnd, mode)
+            Sleep 1200
+        }
+        
+        AddLog("前台输入倍数: " text)
+        SetKeyDelay 150, 100
+        
+        ; 清空
+        SendEvent "^a"
+        Sleep 300
+        SendEvent "{BackSpace}"
+        Sleep 300
+        Loop 10 {
+            SendEvent "{BackSpace}"
+            Sleep 30
+        }
+        Sleep 600
+        
+        ; 输入
+        SendEvent "{Text}" text
+        Sleep 800
+        SendEvent "{Enter}"
+        Sleep 500
     } else {
-        ; 后台输入尝试 (使用 ControlSend)
-        ; 先尝试发送全选和退格
-        ControlSend "^a{BackSpace}", , "ahk_id " hwnd
-        Sleep 200
-        ; 发送文本
-        ControlSend text, , "ahk_id " hwnd
-        Sleep 200
-        ControlSend "{Enter}", , "ahk_id " hwnd
+        ; --- 增强型后台输入 (同步消息注入) ---
+        if (coord[1] > 0 && coord[2] > 0) {
+            AddLog("后台聚焦: " coord[1] ", " coord[2])
+            SafeClick(coord, hwnd, mode)
+            Sleep 1200
+        }
+        
+        AddLog("后台同步输入: " text)
+        
+        ; 1. 后台清空 (发送 WM_KEYDOWN 退格消息)
+        Loop 15 {
+            SendMessage(0x0100, 0x08, 0, , "ahk_id " hwnd) ; WM_KEYDOWN VK_BACK
+            Sleep 30
+        }
+        Sleep 500
+        
+        ; 2. 后台输入 (发送 WM_CHAR 字符消息)
+        Loop Parse, text {
+            char := Ord(A_LoopField)
+            SendMessage(0x0102, char, 0, , "ahk_id " hwnd) ; WM_CHAR
+            Sleep 100
+        }
+        Sleep 800
+        
+        ; 3. 后台回车
+        SendMessage(0x0100, 0x0D, 0, , "ahk_id " hwnd) ; VK_RETURN
+        Sleep 500
     }
 }
 

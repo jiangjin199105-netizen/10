@@ -15,7 +15,21 @@ import {
   Volume2,
   VolumeX,
   Download,
-  Bot
+  Bot,
+  Lock,
+  Key,
+  Calendar,
+  ShieldAlert,
+  UserPlus,
+  UserMinus,
+  Plus,
+  Minus,
+  Snowflake,
+  Flame,
+  RotateCcw,
+  Search,
+  Users,
+  Activity
 } from 'lucide-react';
 import { format, differenceInSeconds } from 'date-fns';
 import { DrawRecord, Recommendation, AppSettings } from './types';
@@ -60,7 +74,70 @@ const getNumberColor = (num: string) => {
   return colors[n] || 'bg-gray-400';
 };
 
+interface User {
+  username: string;
+  password: string;
+  expiry: number; // timestamp
+  isAdmin: boolean;
+  isActivated: boolean;
+  registrationDate: number;
+  isFrozen: boolean;
+}
+
+const LOCAL_USERS_KEY = 'lottery_app_users';
+const ADMIN_DEFAULT_PASS = 'JH8251050';
+
+const getLocalUsers = (): User[] => {
+  const saved = localStorage.getItem(LOCAL_USERS_KEY);
+  if (!saved) {
+    // Initial admin account
+    const admin: User = {
+      username: 'admin',
+      password: ADMIN_DEFAULT_PASS,
+      expiry: Date.now() + 100 * 365 * 24 * 60 * 60 * 1000, // 100 years
+      isAdmin: true,
+      isActivated: true,
+      registrationDate: Date.now(),
+      isFrozen: false
+    };
+    localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify([admin]));
+    return [admin];
+  }
+  const users: User[] = JSON.parse(saved);
+  // Migration: ensure new fields exist
+  return users.map(u => ({
+    ...u,
+    registrationDate: u.registrationDate || Date.now(),
+    isFrozen: u.isFrozen || false
+  }));
+};
+
+const saveLocalUsers = (users: User[]) => {
+  localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
+};
+
 export default function App() {
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = sessionStorage.getItem('current_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [view, setView] = useState<'login' | 'register' | 'admin' | 'app'>(() => {
+    const saved = sessionStorage.getItem('current_user');
+    if (!saved) return 'login';
+    const user = JSON.parse(saved);
+    return user.isAdmin ? 'admin' : 'app';
+  });
+
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [regUsername, setRegUsername] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [regSuccess, setRegSuccess] = useState<boolean>(false);
+  const [adminSearch, setAdminSearch] = useState('');
+  const [expiryModalUser, setExpiryModalUser] = useState<User | null>(null);
+
   const [draws, setDraws] = useState<DrawRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [countdownDuration, setCountdownDuration] = useState<number>(5);
@@ -120,6 +197,93 @@ export default function App() {
     return { ...defaults, ...savedSettings };
   });
   const [macroInfo, setMacroInfo] = useState<{ period: string, numbers: number[] } | null>(null);
+
+  // Check expiry and frozen status for current user
+  useEffect(() => {
+    if (currentUser && !currentUser.isAdmin) {
+      if (currentUser.isFrozen) {
+        setLoginError('您的账号已被冻结，请联系管理员');
+        handleLogout();
+        return;
+      }
+      if (currentUser.expiry < Date.now()) {
+        setLoginError('您的账号已过期，请联系管理员续费');
+        handleLogout();
+      }
+    }
+  }, [currentUser]);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    const users = getLocalUsers();
+    const user = users.find(u => u.username === loginUsername && u.password === loginPassword);
+    
+    if (user) {
+      if (user.isFrozen) {
+        setLoginError('账号已被冻结');
+        return;
+      }
+      if (!user.isAdmin && user.expiry < Date.now()) {
+        setLoginError('账号已过期');
+        return;
+      }
+      setCurrentUser(user);
+      sessionStorage.setItem('current_user', JSON.stringify(user));
+      setView(user.isAdmin ? 'admin' : 'app');
+    } else {
+      setLoginError('用户名或密码错误');
+    }
+  };
+
+  const handleRegister = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    
+    if (regPassword !== regConfirmPassword) {
+      setLoginError('两次输入的密码不一致');
+      return;
+    }
+    
+    if (regUsername.length < 3) {
+      setLoginError('用户名长度至少为3位');
+      return;
+    }
+    
+    if (regPassword.length < 6) {
+      setLoginError('密码长度至少为6位');
+      return;
+    }
+
+    const users = getLocalUsers();
+    if (users.find(u => u.username === regUsername)) {
+      setLoginError('用户名已存在');
+      return;
+    }
+    const newUser: User = {
+      username: regUsername,
+      password: regPassword,
+      expiry: Date.now() + 24 * 60 * 60 * 1000, // Default 1 day for new users
+      isAdmin: false,
+      isActivated: true,
+      registrationDate: Date.now(),
+      isFrozen: false
+    };
+    saveLocalUsers([...users, newUser]);
+    setRegSuccess(true);
+    setTimeout(() => {
+      setRegSuccess(false);
+      setView('login');
+      setLoginUsername(regUsername);
+      setLoginPassword('');
+    }, 2000);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    sessionStorage.removeItem('current_user');
+    setView('login');
+  };
 
   const autoElfScriptContent = `
 ' ///////////////////////////////////////////////////////////////////////////////////////////
@@ -452,7 +616,7 @@ Coords["Key4"] := [799, 700, 1], Coords["Key5"] := [951, 695, 1], Coords["Key6"]
 Coords["Key8"] := [932, 773, 1], Coords["Key9"] := [1073, 767, 1], Coords["KeyReturn"] := [1215, 900, 1]
 
 ; 倍投策略 (6轮)
-global BetSteps := [10, 20, 40, 80, 160, 320]
+global BetSteps := [5, 10, 20, 40, 80, 160]
 
 ; ==============================================================================
 ; 全局变量 (Global Variables)
@@ -478,8 +642,9 @@ MyGui.Add("DropDownList", "x290 y42 w100 vInputMode Choose1", ["点击模式", "
 
 MyGui.Add("GroupBox", "x10 y80 w430 h60", "控制")
 MyGui.Add("Button", "x20 y100 w100 vBtnBind", "1. 绑定窗口").OnEvent("Click", BindWindow)
-MyGui.Add("Button", "x130 y100 w100 vBtnTest", "测试点击").OnEvent("Click", TestClick)
-MyGui.Add("Text", "x240 y105 w180 vLblStatus cBlue", "状态: 未绑定")
+MyGui.Add("Button", "x130 y100 w80 vBtnTest", "测试点击").OnEvent("Click", TestClick)
+MyGui.Add("Button", "x220 y100 w80 vBtnTestInput", "测试输入").OnEvent("Click", TestInput)
+MyGui.Add("Text", "x310 y105 w130 vLblStatus cBlue", "状态: 未绑定")
 
 MyGui.Add("Button", "x20 y150 w100 vBtnStart", "2. 启动脚本").OnEvent("Click", StartScript)
 MyGui.Add("Button", "x130 y150 w100 vBtnStop", "3. 停止脚本").OnEvent("Click", StopScript)
@@ -487,10 +652,17 @@ MyGui.Add("Button", "x240 y150 w100 vBtnConfig", "坐标配置").OnEvent("Click"
 MyGui["BtnStop"].Enabled := false
 
 MyGui.Add("Text", "x10 y190 w380", "运行日志:")
-global LogEdit := MyGui.Add("Edit", "x10 y210 w430 h300 ReadOnly vLogOutput")
+global LogEdit := MyGui.Add("Edit", "x10 y210 w430 h240 ReadOnly vLogOutput")
+
+MyGui.Add("GroupBox", "x10 y460 w430 h60", "倍投金额配置 (1-6轮)")
+global EditSteps := []
+Loop 6 {
+    EditSteps.Push(MyGui.Add("Edit", "x" (20 + (A_Index-1)*70) " y" 485 " w60 vStep" A_Index, BetSteps[A_Index]))
+}
+MyGui.Add("Button", "x10 y525 w430 h30 vBtnSave", "保存金额配置").OnEvent("Click", SaveBetSteps)
 
 MyGui.OnEvent("Close", (*) => ExitApp())
-MyGui.Show("w450 h530")
+MyGui.Show("w450 h570")
 
 ; ==============================================================================
 ; 坐标配置窗口 (Coordinate Configuration GUI)
@@ -504,11 +676,17 @@ OpenConfig(*)
     ConfigGui.Add("Text", "x10 y10 w600 cGray", "提示: 点击'抓取'后，将鼠标移至目标位置按 F8 即可自动填入。输入模式下，键盘坐标可不填。")
     
     ; --- 存档管理区域 ---
-    ConfigGui.Add("GroupBox", "x620 y40 w120 h160", "存档管理")
-    ProfileDDL := ConfigGui.Add("DropDownList", "x630 y65 w100 Choose1", ["存档 1", "存档 2", "存档 3", "存档 4", "存档 5"])
-    ConfigGui.Add("Button", "x630 y100 w100", "保存到存档").OnEvent("Click", (*) => DoSaveProfile(ProfileDDL.Value))
-    ConfigGui.Add("Button", "x630 y135 w100", "从存档加载").OnEvent("Click", (*) => DoLoadProfile(ProfileDDL.Value))
-    ConfigGui.Add("Text", "x630 y175 w100 cGray", "存档保存在\`nProfiles.ini")
+    ConfigGui.Add("GroupBox", "x620 y40 w120 h240", "存档管理")
+    ConfigGui.Add("Text", "x630 y65 w100", "当前名称:")
+    ProfileNameEdit := ConfigGui.Add("Edit", "x630 y85 w100", "默认配置")
+    
+    ConfigGui.Add("Text", "x630 y115 w100", "已有存档:")
+    ProfileDDL := ConfigGui.Add("DropDownList", "x630 y135 w100", GetProfileList())
+    ProfileDDL.OnEvent("Change", (*) => (ProfileNameEdit.Value := ProfileDDL.Text))
+    
+    ConfigGui.Add("Button", "x630 y170 w100", "保存存档").OnEvent("Click", (*) => DoSaveProfile(ProfileNameEdit.Value))
+    ConfigGui.Add("Button", "x630 y205 w100", "加载存档").OnEvent("Click", (*) => DoLoadProfile(ProfileDDL.Text))
+    ConfigGui.Add("Button", "x630 y240 w100", "删除存档").OnEvent("Click", (*) => DoDeleteProfile(ProfileDDL.Text))
     ; --------------------
 
     ; 定义显示名称映射
@@ -583,42 +761,84 @@ OpenConfig(*)
     ConfigGui.Add("Button", "x310 y400 w150 h40 Default", "保存并应用配置").OnEvent("Click", SaveConfig)
     ConfigGui.Show("w750 h460")
 
-    DoSaveProfile(idx) {
+    GetProfileList() {
         iniFile := A_ScriptDir "\Profiles.ini"
-        section := "Profile" idx
+        if !FileExist(iniFile)
+            return ["默认配置"]
+        
+        try {
+            sections := IniRead(iniFile)
+            list := StrSplit(sections, "\`n")
+            if (list.Length == 0)
+                return ["默认配置"]
+            return list
+        } catch {
+            return ["默认配置"]
+        }
+    }
+
+    DoSaveProfile(name) {
+        if (name == "") {
+            MsgBox "请输入存档名称！"
+            return
+        }
+        iniFile := A_ScriptDir "\Profiles.ini"
+        section := name
         for key, editCtrl in Edits {
             IniWrite(editCtrl.Value, iniFile, section, key)
-            IniWrite(Modes[key].Value, iniFile, section, key "_mode")
+            if Modes.Has(key)
+                IniWrite(Modes[key].Value, iniFile, section, key "_mode")
         }
-        ToolTip "已保存到存档 " idx
+        
+        ; 刷新下拉列表
+        ProfileDDL.Delete()
+        ProfileDDL.Add(GetProfileList())
+        ProfileDDL.Text := name
+        
+        ToolTip "已保存存档: " name
         SetTimer () => ToolTip(), -2000
     }
 
-    DoLoadProfile(idx) {
-        iniFile := A_ScriptDir "\Profiles.ini"
-        section := "Profile" idx
-        try {
-            ; 检查存档是否存在
-            IniRead(iniFile, section, "Num1")
-        } catch {
-            MsgBox "该存档为空或不存在！", "提示"
+    DoLoadProfile(name) {
+        if (name == "") {
+            MsgBox "请选择要加载的存档！"
             return
         }
+        iniFile := A_ScriptDir "\Profiles.ini"
+        section := name
         
         for key, editCtrl in Edits {
             try {
                 val := IniRead(iniFile, section, key)
                 editCtrl.Value := val
-                modeVal := IniRead(iniFile, section, key "_mode", "1")
-                Modes[key].Value := Number(modeVal)
-                
-                ; 如果是金额输入框，同步到主界面
-                if (key == "AmountInput") {
-                    MyGui["InputMode"].Value := Number(modeVal)
+                if Modes.Has(key) {
+                    modeVal := IniRead(iniFile, section, key "_mode", "1")
+                    Modes[key].Value := Number(modeVal)
                 }
             }
         }
-        ToolTip "已加载存档 " idx
+        ProfileNameEdit.Value := name
+        ToolTip "已加载存档: " name
+        SetTimer () => ToolTip(), -2000
+    }
+
+    DoDeleteProfile(name) {
+        if (name == "" || name == "默认配置") {
+            MsgBox "无法删除该存档！"
+            return
+        }
+        if (MsgBox("确定要删除存档 [" name "] 吗？", "确认删除", "YesNo") == "No")
+            return
+            
+        iniFile := A_ScriptDir "\Profiles.ini"
+        IniDelete(iniFile, name)
+        
+        ProfileDDL.Delete()
+        ProfileDDL.Add(GetProfileList())
+        ProfileDDL.Choose(1)
+        ProfileNameEdit.Value := ProfileDDL.Text
+        
+        ToolTip "已删除存档: " name
         SetTimer () => ToolTip(), -2000
     }
 
@@ -683,26 +903,31 @@ SyncInputMode(*) {
 ; 核心逻辑 (Core Logic)
 ; ==============================================================================
 
-; 启动时尝试加载存档 1
+; 启动时尝试加载第一个存档
 try {
     iniFile := A_ScriptDir "\Profiles.ini"
     if FileExist(iniFile) {
-        for key, val in Coords {
-            str := IniRead(iniFile, "Profile1", key, "")
-            if (str != "") {
-                parts := StrSplit(str, [",", " ", ";"])
-                if (parts.Length >= 2) {
-                    x := Number(Trim(parts[1]))
-                    y := Number(Trim(parts[2]))
-                    modeVal := IniRead(iniFile, "Profile1", key "_mode", "1")
-                    Coords[key] := [x, y, Number(modeVal)]
-                    
-                    ; 如果是金额输入框，同步到主界面
-                    if (key == "AmountInput") {
-                        MyGui["InputMode"].Value := Number(modeVal)
+        sections := IniRead(iniFile)
+        firstSection := StrSplit(sections, "\`n")[1]
+        if (firstSection != "") {
+            for key, val in Coords {
+                str := IniRead(iniFile, firstSection, key, "")
+                if (str != "") {
+                    parts := StrSplit(str, [",", " ", ";"])
+                    if (parts.Length >= 2) {
+                        x := Number(Trim(parts[1]))
+                        y := Number(Trim(parts[2]))
+                        modeVal := IniRead(iniFile, firstSection, key "_mode", "1")
+                        Coords[key] := [x, y, Number(modeVal)]
+                        
+                        ; 如果是金额输入框，同步到主界面
+                        if (key == "AmountInput") {
+                            MyGui["InputMode"].Value := Number(modeVal)
+                        }
                     }
                 }
             }
+            AddLog("已自动加载存档: " firstSection)
         }
     }
 }
@@ -719,6 +944,19 @@ TestClick(*)
     AddLog("正在测试点击 [号码 01]...")
     SafeClick(Coords["Num1"], TargetHwnd, mode)
     AddLog("测试指令已发送")
+}
+
+TestInput(*)
+{
+    global TargetHwnd
+    if (TargetHwnd == 0) {
+        MsgBox "请先绑定窗口！"
+        return
+    }
+    mode := MyGui["ClickMode"].Text
+    AddLog("正在测试输入 [倍数输入框] (输入: 88)...")
+    SafeType(Coords["AmountInput"], TargetHwnd, mode, "88")
+    AddLog("测试输入指令已发送")
 }
 
 BindWindow(*)
@@ -751,13 +989,33 @@ CaptureWindow(*)
     }
 }
 
+SaveBetSteps(*)
+{
+    global BetSteps
+    Loop 6 {
+        val := MyGui["Step" A_Index].Value
+        if IsNumber(val)
+            BetSteps[A_Index] := Number(val)
+    }
+    AddLog("倍投金额配置已保存: [" BetSteps[1] ", " BetSteps[2] ", " BetSteps[3] ", " BetSteps[4] ", " BetSteps[5] ", " BetSteps[6] "]")
+    MsgBox "倍投金额配置已保存！", "成功", "Iconi"
+}
+
 StartScript(*)
 {
-    global IsRunning, TargetHwnd
+    global IsRunning, TargetHwnd, BetSteps
     if (!TargetHwnd) {
         MsgBox("请先绑定游戏窗口！", "错误", "Icon!")
         return
     }
+    
+    ; 同步 GUI 中的倍投金额
+    Loop 6 {
+        val := MyGui["Step" A_Index].Value
+        if IsNumber(val)
+            BetSteps[A_Index] := Number(val)
+    }
+    AddLog("当前倍投序列: [" BetSteps[1] ", " BetSteps[2] ", " BetSteps[3] ", " BetSteps[4] ", " BetSteps[5] ", " BetSteps[6] "]")
     
     IsRunning := true
     MyGui["BtnStart"].Enabled := false
@@ -765,8 +1023,7 @@ StartScript(*)
     MyGui["BtnBind"].Enabled := false
     
     AddLog("脚本已启动，开始监听网页端指令...")
-    SetTimer CheckAPI, 15000 ; 每15秒检查一次
-    CheckAPI() ; 立即运行一次
+    SetTimer CheckAPI, 1000 ; 1秒后开始第一次检查
 }
 
 StopScript(*)
@@ -777,13 +1034,16 @@ StopScript(*)
     MyGui["BtnStop"].Enabled := false
     MyGui["BtnBind"].Enabled := true
     
-    SetTimer CheckAPI, 0 ; 关闭定时器
+    SetTimer CheckAPI, 0 ; 彻底关闭定时器
     AddLog("脚本已停止。")
 }
 
 CheckAPI()
 {
     global ServerURL, LastBetPeriod, BetSteps, TargetHwnd, IsRunning
+    
+    ; 1. 立即停止定时器，防止在下注过程中触发第二次检查
+    SetTimer CheckAPI, 0
     
     if (!IsRunning)
         return
@@ -792,29 +1052,28 @@ CheckAPI()
     
     try {
         whr := ComObject("WinHttp.WinHttpRequest.5.1")
-        whr.SetTimeouts(2000, 2000, 2000, 5000) ; Resolve, Connect, Send, Receive timeouts
-        whr.Open("GET", savedURL "?t=" A_TickCount, true) ; Async=true
+        whr.SetTimeouts(2000, 2000, 2000, 5000)
+        whr.Open("GET", savedURL "?t=" A_TickCount, true)
         whr.Send()
         
-        ; Wait for response with timeout (5 seconds)
-        if (whr.WaitForResponse(5) == 0) { ; 0 = Timeout
-            AddLog("连接超时 (5s) - 正在重试...")
+        if (whr.WaitForResponse(5) == 0) {
+            AddLog("连接超时 (5s) - 稍后重试...")
+            if (IsRunning)
+                SetTimer CheckAPI, 5000 ; 超时后5秒重试
             return
         }
         
         if (whr.Status != 200) {
             AddLog("网络错误: 状态码 " whr.Status)
+            if (IsRunning)
+                SetTimer CheckAPI, 10000 ; 错误后10秒重试
             return
         }
         
         Ret := whr.ResponseText
+        loopPeriod := "", loopStep := 0, loopNumbersStr := ""
         
-        ; 使用最简单的字符串查找来解析 JSON
-        loopPeriod := ""
-        loopStep := 0
-        loopNumbersStr := ""
-        
-        ; 解析 period
+        ; 解析逻辑 (略...)
         pos1 := InStr(Ret, '"period":"')
         if (pos1 > 0) {
             pos1 += 10
@@ -822,31 +1081,17 @@ CheckAPI()
             if (pos2 > 0)
                 loopPeriod := SubStr(Ret, pos1, pos2 - pos1)
         }
-        
-        ; 解析 step
         pos1 := InStr(Ret, '"step":')
         if (pos1 > 0) {
             pos1 += 7
-            ; 找到下一个逗号或右大括号
-            pos2 := InStr(Ret, ",",, pos1)
-            pos3 := InStr(Ret, "}",, pos1)
-            
-            endPos := 0
-            if (pos2 > 0 && pos3 > 0)
-                endPos := Min(pos2, pos3)
-            else if (pos2 > 0)
-                endPos := pos2
-            else if (pos3 > 0)
-                endPos := pos3
-                
+            pos2 := InStr(Ret, ",",, pos1), pos3 := InStr(Ret, "}",, pos1)
+            endPos := (pos2 > 0 && pos3 > 0) ? Min(pos2, pos3) : (pos2 > 0 ? pos2 : pos3)
             if (endPos > 0) {
                 stepStr := Trim(SubStr(Ret, pos1, endPos - pos1), " \`t\`r\`n\`"")
                 if IsNumber(stepStr)
                     loopStep := Integer(stepStr)
             }
         }
-        
-        ; 解析 numbers
         pos1 := InStr(Ret, '"numbers":[')
         if (pos1 > 0) {
             pos1 += 11
@@ -859,28 +1104,27 @@ CheckAPI()
         }
         
         if (loopPeriod != "" && loopPeriod != LastBetPeriod && loopStep >= 1 && loopStep <= 6) {
-            AddLog(">>> 获取新指令: " loopPeriod " 期, 第 " loopStep " 轮")
+            AddLog(">>> 发现新指令: " loopPeriod " 期, 第 " loopStep " 轮")
             
+            ; 关键：先更新期号，防止下注过程中重复触发
+            LastBetPeriod := loopPeriod
+            
+            ; 执行下注 (这是一个耗时操作)
             PlaceBet(TargetHwnd, loopNumbersStr, loopStep)
             
-            LastBetPeriod := loopPeriod
-            AddLog("<<< 期号 " loopPeriod " 下注完成，等待下期")
+            AddLog("<<< 期号 " loopPeriod " 下注动作执行完毕")
         } else {
-            ; 无论是否有新号，都记录心跳日志，确保用户知道程序在运行
             curStatus := (loopPeriod != "") ? "当前期号: " loopPeriod : "等待数据..."
-            
-            ; 调试信息：如果期号变了但没下注，说明 Step 解析失败或范围不对
-            if (loopPeriod != "" && loopPeriod != LastBetPeriod) {
-                AddLog("警告: 检测到新期号但未下注! 解析Step: " loopStep)
-                AddLog("调试数据: " Ret)
-            }
-            
             AddLog("运行正常: 监听中... (" curStatus ")")
         }
         
     } catch as err {
         AddLog("请求失败: " err.Message)
     }
+    
+    ; 2. 任务彻底结束后，重新开启定时器 (15秒后进行下一次检查)
+    if (IsRunning)
+        SetTimer CheckAPI, 15000
 }
 
 PlaceBet(hwnd, numbersStr, stepNum)
@@ -896,10 +1140,10 @@ PlaceBet(hwnd, numbersStr, stepNum)
             WinActivate "ahk_id " hwnd
             WinWaitActive "ahk_id " hwnd,, 2
         }
-        Sleep 800
+        Sleep 1000
     } else {
         AddLog("准备后台点击...")
-        Sleep 300
+        Sleep 1000
     }
     
     ; 1. 选中推荐号码
@@ -910,7 +1154,6 @@ PlaceBet(hwnd, numbersStr, stepNum)
         if IsNumber(n) {
             if (Coords.Has("Num" n)) {
                 SafeClick(Coords["Num" n], hwnd, mode)
-                Sleep 150
             }
         }
     }
@@ -920,17 +1163,14 @@ PlaceBet(hwnd, numbersStr, stepNum)
     if (inputCoord[3] == 2) { ; 输入模式 (直接键盘输入)
         AddLog(">>> 模式: 直接键盘输入 (倍数: " betAmount ")")
         SafeType(inputCoord, hwnd, mode, String(betAmount))
-        Sleep(800)
     } else {
         ; 点击模式 (使用虚拟键盘坐标)
         AddLog(">>> 模式: 虚拟键盘点击 (倍数: " betAmount ")")
         SafeClick(inputCoord, hwnd, mode)
-        Sleep(800)
         
         ; 3. 点击小键盘“清零”
         if (Coords.Has("KeyClear")) {
             SafeClick(Coords["KeyClear"], hwnd, mode)
-            Sleep(400)
         }
         
         ; 4. 输入倍数
@@ -939,26 +1179,24 @@ PlaceBet(hwnd, numbersStr, stepNum)
             digit := A_LoopField
             if (Coords.Has("Key" digit)) {
                 SafeClick(Coords["Key" digit], hwnd, mode)
-                Sleep(250)
             }
         }
         
         ; 5. 点击小键盘“确认”
         if (Coords.Has("KeyConfirm")) {
             SafeClick(Coords["KeyConfirm"], hwnd, mode)
-            Sleep(600)
         }
     }
     
     ; 6. 点击“立即投注”
     AddLog("点击立即投注")
     SafeClick(Coords["SubmitBet"], hwnd, mode)
-    Sleep 500
     
     ; 7. 点击“返回”
-    AddLog("点击返回")
-    SafeClick(Coords["KeyReturn"], hwnd, mode)
-    Sleep 500
+    if (Coords.Has("KeyReturn")) {
+        AddLog("点击返回")
+        SafeClick(Coords["KeyReturn"], hwnd, mode)
+    }
 }
 
 SafeClick(coord, hwnd, mode)
@@ -992,51 +1230,75 @@ SafeClick(coord, hwnd, mode)
         Click "Down"
         Sleep 200 ; 模拟器识别触控通常需要 >150ms 的停留
         Click "Up"
-        Sleep 100
+        Sleep 1000 ; 每步操作后延迟1秒
     } else {
         try {
             ; 后台点击尝试 (后台通常也基于客户区)
             ControlClick "x" x " y" y, "ahk_id " hwnd,,,, "NA"
-            Sleep 200
+            Sleep 1000 ; 每步操作后延迟1秒
         }
     }
 }
 
 SafeType(coord, hwnd, mode, text)
 {
-    ; 如果设置了坐标，则先点击聚焦输入框
-    if (coord[1] > 0 && coord[2] > 0) {
-        SafeClick(coord, hwnd, mode)
-        Sleep(500)
-    }
-    
     if (mode == "前台点击") {
-        ; 确保窗口激活
-        WinActivate "ahk_id " hwnd
-        
-        ; 全选并删除旧内容 (兼容大部分输入框)
-        Send "^a"
-        Sleep(200)
-        Send "{BackSpace}"
-        Sleep(200)
-        
-        ; 逐字输入，提高兼容性
-        Loop Parse, text {
-            Send A_LoopField
-            Sleep(50)
+        ; --- 前台模式：已验证成功 ---
+        try {
+            WinActivate "ahk_id " hwnd
+            WinWaitActive "ahk_id " hwnd,, 2
         }
         
-        Sleep(200)
-        Send "{Enter}" ; 发送回车确认
+        if (coord[1] > 0 && coord[2] > 0) {
+            AddLog("前台聚焦: " coord[1] ", " coord[2])
+            SafeClick(coord, hwnd, mode)
+            Sleep 1200
+        }
+        
+        AddLog("前台输入倍数: " text)
+        SetKeyDelay 150, 100
+        
+        ; 清空
+        SendEvent "^a"
+        Sleep 300
+        SendEvent "{BackSpace}"
+        Sleep 300
+        Loop 10 {
+            SendEvent "{BackSpace}"
+            Sleep 30
+        }
+        Sleep 600
+        
+        ; 输入
+        SendEvent "{Text}" text
+        Sleep 800
+        SendEvent "{Enter}"
+        Sleep 500
     } else {
-        ; 后台输入尝试 (使用 ControlSend)
-        ; 先尝试发送全选和退格
-        ControlSend "^a{BackSpace}", , "ahk_id " hwnd
-        Sleep(200)
-        ; 发送文本
-        ControlSend text, , "ahk_id " hwnd
-        Sleep(200)
+        ; --- 后台模式：使用兼容性更好的 ControlSend ---
+        if (coord[1] > 0 && coord[2] > 0) {
+            AddLog("后台聚焦: " coord[1] ", " coord[2])
+            SafeClick(coord, hwnd, mode)
+            Sleep 1200
+        }
+        
+        AddLog("后台尝试输入: " text)
+        ; 清空
+        ControlSend "^a", , "ahk_id " hwnd
+        Sleep 300
+        ControlSend "{BackSpace}", , "ahk_id " hwnd
+        Sleep 300
+        Loop 10 {
+            ControlSend "{BackSpace}", , "ahk_id " hwnd
+            Sleep 30
+        }
+        Sleep 600
+        
+        ; 输入 (使用 Text 模式)
+        ControlSend "{Text}" text, , "ahk_id " hwnd
+        Sleep 800
         ControlSend "{Enter}", , "ahk_id " hwnd
+        Sleep 500
     }
 }
 
@@ -1384,17 +1646,17 @@ F7::
           let recommendedNumbers: number[] = [];
 
           if (index === 0) { // 1st position in 46th
-            // 6, 7, 8, 10名 -> indices 5, 6, 7, 9 from 45th
-            recommendedNumbers = [targetNums45[5], targetNums45[6], targetNums45[7], targetNums45[9]];
-          } else if (index === 9) { // 10th position in 46th
             // 1, 3, 4, 5名 -> indices 0, 2, 3, 4 from 45th
             recommendedNumbers = [targetNums45[0], targetNums45[2], targetNums45[3], targetNums45[4]];
+          } else if (index === 9) { // 10th position in 46th
+            // 6, 7, 8, 10名 -> indices 5, 6, 7, 9 from 45th
+            recommendedNumbers = [targetNums45[5], targetNums45[6], targetNums45[7], targetNums45[9]];
           } else if (index >= 1 && index <= 4) { // Left half (not 1st) in 46th
-            // 6, 7, 8, 9名 -> indices 5, 6, 7, 8 from 45th
-            recommendedNumbers = [targetNums45[5], targetNums45[6], targetNums45[7], targetNums45[8]];
-          } else if (index >= 5 && index <= 8) { // Right half (not 10th) in 46th
             // 2, 3, 4, 5名 -> indices 1, 2, 3, 4 from 45th
             recommendedNumbers = [targetNums45[1], targetNums45[2], targetNums45[3], targetNums45[4]];
+          } else if (index >= 5 && index <= 8) { // Right half (not 10th) in 46th
+            // 6, 7, 8, 9名 -> indices 5, 6, 7, 8 from 45th
+            recommendedNumbers = [targetNums45[5], targetNums45[6], targetNums45[7], targetNums45[8]];
           }
 
           if (recommendedNumbers.length > 0) {
@@ -1526,18 +1788,546 @@ F7::
     );
   };
 
+  if (view === 'login' || view === 'register') {
+    return (
+      <div className="min-h-screen bg-[#141414] flex items-center justify-center p-4 font-sans">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md bg-[#E4E3E0] border border-[#141414] p-8 shadow-2xl"
+        >
+          <div className="flex flex-col items-center mb-8">
+            <div className="w-16 h-16 bg-[#141414] rounded-full flex items-center justify-center mb-4">
+              <Lock className="text-[#E4E3E0] w-8 h-8" />
+            </div>
+            <h1 className="text-2xl font-serif font-bold italic text-[#141414] mb-2">开奖大师 - {view === 'login' ? '账号登录' : '用户注册'}</h1>
+            <p className="text-gray-600 text-sm text-center font-mono">{view === 'login' ? '请输入您的账号信息' : '请填写注册信息'}</p>
+          </div>
+
+          <form onSubmit={view === 'login' ? handleLogin : handleRegister} className="space-y-6">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest mb-2">用户名</label>
+                <div className="relative">
+                  <Bot className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input 
+                    type="text"
+                    value={view === 'login' ? loginUsername : regUsername}
+                    onChange={(e) => view === 'login' ? setLoginUsername(e.target.value) : setRegUsername(e.target.value)}
+                    className="w-full bg-white border border-[#141414] py-3 pl-10 pr-4 text-[#141414] font-mono focus:outline-none focus:ring-1 focus:ring-[#141414] transition-all"
+                    placeholder="请输入用户名..."
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest mb-2">密码</label>
+                <div className="relative">
+                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input 
+                    type="password"
+                    value={view === 'login' ? loginPassword : regPassword}
+                    onChange={(e) => view === 'login' ? setLoginPassword(e.target.value) : setRegPassword(e.target.value)}
+                    className="w-full bg-white border border-[#141414] py-3 pl-10 pr-4 text-[#141414] font-mono focus:outline-none focus:ring-1 focus:ring-[#141414] transition-all"
+                    placeholder="请输入密码..."
+                    required
+                  />
+                </div>
+              </div>
+              {view === 'register' && (
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest mb-2">确认密码</label>
+                  <div className="relative">
+                    <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input 
+                      type="password"
+                      value={regConfirmPassword}
+                      onChange={(e) => setRegConfirmPassword(e.target.value)}
+                      className="w-full bg-white border border-[#141414] py-3 pl-10 pr-4 text-[#141414] font-mono focus:outline-none focus:ring-1 focus:ring-[#141414] transition-all"
+                      placeholder="请再次输入密码..."
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {loginError && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="bg-red-50 border border-red-200 p-3 flex items-center gap-3"
+              >
+                <AlertCircle className="text-red-500 w-4 h-4 shrink-0" />
+                <span className="text-red-600 text-xs font-mono">{loginError}</span>
+              </motion.div>
+            )}
+
+            {regSuccess && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="bg-emerald-50 border border-emerald-200 p-3 flex items-center gap-3"
+              >
+                <CheckCircle2 className="text-emerald-500 w-4 h-4 shrink-0" />
+                <span className="text-emerald-600 text-xs font-mono">注册成功！正在跳转登录...</span>
+              </motion.div>
+            )}
+
+            <button 
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#141414] hover:bg-emerald-600 disabled:opacity-50 text-[#E4E3E0] font-bold py-3 transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-sm"
+            >
+              {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              {view === 'login' ? '立即登录' : '立即注册'}
+            </button>
+          </form>
+
+          <div className="mt-6 flex items-center justify-between text-[10px] font-mono uppercase tracking-widest">
+            <button 
+              onClick={() => {
+                setView(view === 'login' ? 'register' : 'login');
+                setLoginError(null);
+              }}
+              className="text-gray-500 hover:text-[#141414] transition-colors"
+            >
+              {view === 'login' ? '没有账号？去注册' : '已有账号？去登录'}
+            </button>
+            {view === 'login' && (
+              <button 
+                onClick={() => {
+                  setLoginUsername('admin');
+                  setLoginPassword('');
+                  setLoginError('请输入管理员密码');
+                }}
+                className="text-gray-400 hover:text-[#141414] transition-colors flex items-center gap-1"
+              >
+                <ShieldAlert size={12} />
+                后台管理
+              </button>
+            )}
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (view === 'admin') {
+    const users = getLocalUsers();
+    const filteredUsers = users.filter(u => u.username.toLowerCase().includes(adminSearch.toLowerCase()));
+    
+    const stats = {
+      total: users.length,
+      active: users.filter(u => u.expiry > Date.now() && !u.isFrozen).length,
+      expired: users.filter(u => u.expiry <= Date.now() && !u.isAdmin).length,
+      frozen: users.filter(u => u.isFrozen).length
+    };
+
+    return (
+      <div className="min-h-screen bg-[#141414] text-[#141414] font-sans p-6">
+        <div className="max-w-7xl mx-auto bg-[#E4E3E0] border border-[#141414] shadow-2xl min-h-[90vh] flex flex-col">
+          <div className="p-8 border-b border-[#141414] flex justify-between items-center bg-white">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-[#141414] rounded-full flex items-center justify-center">
+                <ShieldAlert className="text-[#E4E3E0] w-6 h-6" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-serif font-bold italic">管理后台</h1>
+                <p className="text-gray-500 text-[10px] font-mono uppercase tracking-widest">用户授权与系统管理</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input 
+                  type="text"
+                  placeholder="搜索用户名..."
+                  value={adminSearch}
+                  onChange={(e) => setAdminSearch(e.target.value)}
+                  className="bg-gray-100 border border-gray-200 py-2 pl-10 pr-4 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#141414] transition-all w-64"
+                />
+              </div>
+              <button 
+                onClick={handleLogout}
+                className="px-6 py-2 bg-[#141414] text-white font-mono text-xs uppercase tracking-widest hover:bg-red-600 transition-colors"
+              >
+                退出管理
+              </button>
+            </div>
+          </div>
+
+          <div className="p-8 grid grid-cols-1 md:grid-cols-4 gap-6 bg-white/50 border-b border-[#141414]">
+            <div className="bg-white p-4 border border-[#141414] shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <Users className="w-4 h-4 text-gray-400" />
+                <span className="text-[10px] font-mono uppercase text-gray-400">总用户</span>
+              </div>
+              <div className="text-2xl font-serif font-bold">{stats.total}</div>
+            </div>
+            <div className="bg-white p-4 border border-[#141414] shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <Activity className="w-4 h-4 text-emerald-500" />
+                <span className="text-[10px] font-mono uppercase text-gray-400">活跃用户</span>
+              </div>
+              <div className="text-2xl font-serif font-bold text-emerald-600">{stats.active}</div>
+            </div>
+            <div className="bg-white p-4 border border-[#141414] shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <Clock className="w-4 h-4 text-orange-500" />
+                <span className="text-[10px] font-mono uppercase text-gray-400">已到期</span>
+              </div>
+              <div className="text-2xl font-serif font-bold text-orange-600">{stats.expired}</div>
+            </div>
+            <div className="bg-white p-4 border border-[#141414] shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <Snowflake className="w-4 h-4 text-blue-500" />
+                <span className="text-[10px] font-mono uppercase text-gray-400">已冻结</span>
+              </div>
+              <div className="text-2xl font-serif font-bold text-blue-600">{stats.frozen}</div>
+            </div>
+          </div>
+
+          <div className="flex-1 p-8 overflow-y-auto">
+            <div className="bg-white border border-[#141414] overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100 text-gray-500 text-[10px] uppercase tracking-widest font-mono border-b border-[#141414]">
+                      <th className="px-6 py-4 font-bold">用户信息</th>
+                      <th className="px-6 py-4 font-bold">注册日期</th>
+                      <th className="px-6 py-4 font-bold">到期时间</th>
+                      <th className="px-6 py-4 font-bold">状态</th>
+                      <th className="px-6 py-4 font-bold text-right">管理操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#141414]/10">
+                    {filteredUsers.map((user, idx) => (
+                      <tr key={idx} className={`hover:bg-gray-50 transition-colors group font-mono text-xs ${user.isFrozen ? 'opacity-60 grayscale' : ''}`}>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${user.isAdmin ? 'bg-amber-500' : 'bg-[#141414]'}`}>
+                              {user.username.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="font-bold flex items-center gap-2">
+                                {user.username}
+                                {user.isAdmin && <span className="text-[8px] bg-amber-100 text-amber-700 px-1 rounded border border-amber-200">ADMIN</span>}
+                              </div>
+                              <div className="text-[9px] text-gray-400">ID: {idx + 1}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-gray-500">{format(new Date(user.registrationDate || Date.now()), 'yyyy-MM-dd')}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-3 h-3 opacity-30" />
+                            <span className={user.expiry < Date.now() && !user.isAdmin ? 'text-red-600 font-bold' : 'text-gray-600'}>
+                              {format(new Date(user.expiry), 'yyyy-MM-dd HH:mm')}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            {user.isFrozen ? (
+                              <span className="flex items-center gap-1 text-[9px] text-blue-600 font-bold uppercase bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                <Snowflake size={10} /> 已冻结
+                              </span>
+                            ) : user.expiry < Date.now() && !user.isAdmin ? (
+                              <span className="flex items-center gap-1 text-[9px] text-red-600 font-bold uppercase bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                                <XCircle size={10} /> 已过期
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-[9px] text-emerald-600 font-bold uppercase bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                <CheckCircle2 size={10} /> 正常
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {!user.isAdmin && (
+                            <div className="flex items-center justify-end gap-1">
+                              <button 
+                                onClick={() => setExpiryModalUser(user)}
+                                className="p-2 hover:bg-emerald-50 text-emerald-600 rounded transition-colors"
+                                title="调整时间"
+                              >
+                                {Number(user.expiry) > Date.now() ? <Clock size={16} /> : <UserPlus size={16} />}
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  const allUsers = getLocalUsers();
+                                  const uIdx = allUsers.findIndex(u => u.username === user.username);
+                                  if (uIdx !== -1) {
+                                    allUsers[uIdx].isFrozen = !allUsers[uIdx].isFrozen;
+                                    saveLocalUsers(allUsers);
+                                    window.location.reload();
+                                  }
+                                }}
+                                className={`p-2 rounded transition-colors ${user.isFrozen ? 'hover:bg-orange-50 text-orange-600' : 'hover:bg-blue-50 text-blue-600'}`}
+                                title={user.isFrozen ? "解冻" : "冻结"}
+                              >
+                                {user.isFrozen ? <Flame size={16} /> : <Snowflake size={16} />}
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  const newPass = prompt(`重置用户 ${user.username} 的密码:`, '123456');
+                                  if (newPass) {
+                                    const allUsers = getLocalUsers();
+                                    const uIdx = allUsers.findIndex(u => u.username === user.username);
+                                    if (uIdx !== -1) {
+                                      allUsers[uIdx].password = newPass;
+                                      saveLocalUsers(allUsers);
+                                      alert('密码重置成功');
+                                    }
+                                  }
+                                }}
+                                className="p-2 hover:bg-gray-100 text-gray-600 rounded transition-colors"
+                                title="重置密码"
+                              >
+                                <RotateCcw size={16} />
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  if (confirm(`确定要彻底删除用户 ${user.username} 吗？此操作不可撤销。`)) {
+                                    const allUsers = getLocalUsers().filter(u => u.username !== user.username);
+                                    saveLocalUsers(allUsers);
+                                    window.location.reload();
+                                  }
+                                }}
+                                className="p-2 hover:bg-red-50 text-red-600 rounded transition-colors"
+                                title="删除用户"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredUsers.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-10 text-center text-gray-400 font-mono italic">未找到匹配的用户</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <AnimatePresence>
+            {expiryModalUser && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="bg-[#E4E3E0] border border-[#141414] shadow-2xl w-full max-w-md overflow-hidden"
+                >
+                  <div className="p-6 border-b border-[#141414] bg-white flex justify-between items-center">
+                    <div>
+                      <h2 className="text-xl font-serif font-bold italic">调整到期时间</h2>
+                      <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">用户: {expiryModalUser.username}</p>
+                    </div>
+                    <button onClick={() => setExpiryModalUser(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                      <XCircle className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  <div className="p-8 space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-mono uppercase text-gray-500 tracking-widest">当前到期时间</label>
+                      <div className="p-4 bg-white border border-[#141414] font-mono text-sm flex items-center gap-3">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        {format(new Date(expiryModalUser.expiry), 'yyyy-MM-dd HH:mm:ss')}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-mono uppercase text-gray-500 tracking-widest">快捷调整</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button 
+                          onClick={() => {
+                            const allUsers = getLocalUsers();
+                            const uIdx = allUsers.findIndex(u => u.username === expiryModalUser.username);
+                            if (uIdx !== -1) {
+                              allUsers[uIdx].expiry += 1 * 24 * 60 * 60 * 1000;
+                              saveLocalUsers(allUsers);
+                              setExpiryModalUser(allUsers[uIdx]);
+                            }
+                          }}
+                          className="flex items-center justify-center gap-2 py-3 bg-white border border-[#141414] hover:bg-emerald-50 text-emerald-700 font-mono text-xs transition-colors"
+                        >
+                          <Plus size={14} /> 增加 1 天
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const allUsers = getLocalUsers();
+                            const uIdx = allUsers.findIndex(u => u.username === expiryModalUser.username);
+                            if (uIdx !== -1) {
+                              allUsers[uIdx].expiry += 7 * 24 * 60 * 60 * 1000;
+                              saveLocalUsers(allUsers);
+                              setExpiryModalUser(allUsers[uIdx]);
+                            }
+                          }}
+                          className="flex items-center justify-center gap-2 py-3 bg-white border border-[#141414] hover:bg-emerald-50 text-emerald-700 font-mono text-xs transition-colors"
+                        >
+                          <Plus size={14} /> 增加 7 天
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const allUsers = getLocalUsers();
+                            const uIdx = allUsers.findIndex(u => u.username === expiryModalUser.username);
+                            if (uIdx !== -1) {
+                              allUsers[uIdx].expiry += 30 * 24 * 60 * 60 * 1000;
+                              saveLocalUsers(allUsers);
+                              setExpiryModalUser(allUsers[uIdx]);
+                            }
+                          }}
+                          className="flex items-center justify-center gap-2 py-3 bg-white border border-[#141414] hover:bg-emerald-50 text-emerald-700 font-mono text-xs transition-colors"
+                        >
+                          <Plus size={14} /> 增加 30 天
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const allUsers = getLocalUsers();
+                            const uIdx = allUsers.findIndex(u => u.username === expiryModalUser.username);
+                            if (uIdx !== -1) {
+                              allUsers[uIdx].expiry += 365 * 24 * 60 * 60 * 1000;
+                              saveLocalUsers(allUsers);
+                              setExpiryModalUser(allUsers[uIdx]);
+                            }
+                          }}
+                          className="flex items-center justify-center gap-2 py-3 bg-white border border-[#141414] hover:bg-emerald-50 text-emerald-700 font-mono text-xs transition-colors"
+                        >
+                          <Plus size={14} /> 增加 1 年
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button 
+                          onClick={() => {
+                            const allUsers = getLocalUsers();
+                            const uIdx = allUsers.findIndex(u => u.username === expiryModalUser.username);
+                            if (uIdx !== -1) {
+                              allUsers[uIdx].expiry -= 1 * 24 * 60 * 60 * 1000;
+                              saveLocalUsers(allUsers);
+                              setExpiryModalUser(allUsers[uIdx]);
+                            }
+                          }}
+                          className="flex items-center justify-center gap-2 py-3 bg-white border border-[#141414] hover:bg-red-50 text-red-700 font-mono text-xs transition-colors"
+                        >
+                          <Minus size={14} /> 扣除 1 天
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const allUsers = getLocalUsers();
+                            const uIdx = allUsers.findIndex(u => u.username === expiryModalUser.username);
+                            if (uIdx !== -1) {
+                              allUsers[uIdx].expiry = Date.now();
+                              saveLocalUsers(allUsers);
+                              setExpiryModalUser(allUsers[uIdx]);
+                            }
+                          }}
+                          className="flex items-center justify-center gap-2 py-3 bg-white border border-[#141414] hover:bg-red-50 text-red-700 font-mono text-xs transition-colors"
+                        >
+                          <Clock size={14} /> 立即到期
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-mono uppercase text-gray-500 tracking-widest">自定义天数</label>
+                      <div className="flex gap-2">
+                        <input 
+                          type="number"
+                          id="customDays"
+                          placeholder="输入天数..."
+                          className="flex-1 p-3 bg-white border border-[#141414] font-mono text-xs focus:outline-none focus:ring-1 focus:ring-[#141414]"
+                        />
+                        <button 
+                          onClick={() => {
+                            const input = document.getElementById('customDays') as HTMLInputElement;
+                            const days = Number(input.value);
+                            if (days && !isNaN(days)) {
+                              const allUsers = getLocalUsers();
+                              const uIdx = allUsers.findIndex(u => u.username === expiryModalUser.username);
+                              if (uIdx !== -1) {
+                                allUsers[uIdx].expiry += days * 24 * 60 * 60 * 1000;
+                                saveLocalUsers(allUsers);
+                                setExpiryModalUser(allUsers[uIdx]);
+                                input.value = '';
+                              }
+                            }
+                          }}
+                          className="px-6 bg-[#141414] text-white font-mono text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-colors"
+                        >
+                          应用
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6 bg-gray-50 border-t border-[#141414] flex justify-end">
+                    <button 
+                      onClick={() => {
+                        setExpiryModalUser(null);
+                        window.location.reload();
+                      }}
+                      className="px-8 py-3 bg-[#141414] text-white font-mono text-xs uppercase tracking-widest hover:bg-gray-800 transition-colors"
+                    >
+                      完成并关闭
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Expiry Alert */}
+      {currentUser && !currentUser.isAdmin && currentUser.expiry < Date.now() && (
+        <div className="bg-red-600 text-white p-2 text-center text-[10px] font-mono uppercase tracking-widest flex items-center justify-center gap-2">
+          <ShieldAlert size={12} />
+          软件已过期，请重新激活以获取最新推荐
+          <button onClick={handleLogout} className="underline ml-2">退出登录</button>
+        </div>
+      )}
       {/* Header */}
       <header className="border-b border-[#141414] p-6 flex justify-between items-center bg-[#E4E3E0] sticky top-0 z-10">
         <div>
           <h1 className="text-4xl font-serif font-black uppercase tracking-tighter leading-none">
             开奖大师 <span className="text-sm font-sans font-normal normal-case tracking-normal opacity-50 ml-2">v1.0</span>
           </h1>
-          <p className="text-xs font-mono mt-1 opacity-60 uppercase">实时积分开奖分析与策略</p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-xs font-mono opacity-60 uppercase">实时积分开奖分析与策略</p>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono bg-[#141414]/5 px-2 py-0.5 rounded border border-[#141414]/10">
+                用户: {currentUser?.username}
+              </span>
+              {!currentUser?.isAdmin && (
+                <span className="text-[10px] font-mono bg-[#141414]/5 px-2 py-0.5 rounded border border-[#141414]/10">
+                  有效期至: {format(new Date(currentUser?.expiry || 0), 'yyyy-MM-dd')}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
         
         <div className="flex items-center gap-4">
+          <button 
+            onClick={handleLogout}
+            className="p-2 hover:bg-[#141414]/5 rounded transition-colors text-gray-500 hover:text-[#141414]"
+            title="退出登录"
+          >
+            <XCircle size={20} />
+          </button>
           <div className="flex flex-col items-end mr-4 border-r border-[#141414]/10 pr-4">
             <span className="text-[10px] font-mono uppercase opacity-50">最后读取</span>
             <span className="text-xs font-mono font-bold">
@@ -1583,9 +2373,9 @@ F7::
         </div>
       </header>
 
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_500px] overflow-hidden">
+      <main className="flex-1 overflow-hidden">
         {/* Left Column: History */}
-        <section className="border-r border-[#141414] overflow-y-auto bg-white/50">
+        <section className="overflow-y-auto bg-white/50">
           <div className="p-4 border-b border-[#141414] flex justify-between items-center bg-[#E4E3E0]">
             <div className="flex items-center gap-2">
               <History size={16} className="opacity-50" />
@@ -1644,114 +2434,6 @@ F7::
               </motion.div>
             ))}
           </AnimatePresence>
-        </section>
-
-        {/* Right Column: Comparison Analysis */}
-        <section className="flex flex-col bg-[#141414] text-[#E4E3E0]">
-          <div className="p-4 border-b border-[#E4E3E0]/20 flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <GitCompare size={18} className="text-emerald-400" />
-              <span className="font-serif italic text-sm uppercase font-bold tracking-widest">历史对比分析</span>
-            </div>
-          </div>
-
-          <div className="flex-1 p-8 overflow-y-auto">
-            {draws.length > 0 ? (
-              <div className="space-y-2">
-                <div className="mb-8">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-sm font-mono text-gray-400 uppercase">最新4期冠军号码</span>
-                  </div>
-                  <div className="flex gap-3">
-                    {draws.slice(0, 4).map((draw, idx) => {
-                      const champion = Array.isArray(draw.result) 
-                        ? String(draw.result[0]) 
-                        : String(draw.result).split(/[,\s]+/)[0];
-                      return (
-                        <div key={idx} className="flex flex-col items-center gap-1">
-                          <div className={`${getNumberColor(champion)} text-white w-10 h-10 flex items-center justify-center rounded-full font-bold text-lg shadow-md`}>
-                            {champion}
-                          </div>
-                          <span className="text-[10px] font-mono text-gray-500">{draw.period.slice(-3)}期</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                
-                <div className="h-px bg-[#E4E3E0]/10 my-6"></div>
-                
-                {draws.length > 49 ? (
-                  <>
-                    {renderComparisonRow("对比 - 45期", draws[45])}
-                    {renderComparisonRow("对比 - 46期", draws[46])}
-                    {renderComparisonRow("对比 - 47期", draws[47])}
-                    {renderComparisonRow("对比 - 48期", draws[48])}
-                    {renderComparisonRow("对比 - 49期", draws[49])}
-
-                    <div className="h-px bg-[#E4E3E0]/10 my-6"></div>
-                    
-                    <div className="space-y-4">
-                      <div className="text-sm font-mono text-gray-400 uppercase mb-2">冠军位置分析</div>
-                      
-                      {[
-                        { championDraw: draws[3], targetDraw: draws[49], label: "第4期冠军 vs 49期" },
-                        { championDraw: draws[2], targetDraw: draws[48], label: "第3期冠军 vs 48期" },
-                        { championDraw: draws[1], targetDraw: draws[47], label: "第2期冠军 vs 47期" },
-                        { championDraw: draws[0], targetDraw: draws[46], label: "最新冠军 vs 46期" }
-                      ].map((item, idx) => {
-                        const champion = Array.isArray(item.championDraw.result) 
-                          ? item.championDraw.result[0] 
-                          : parseInt(String(item.championDraw.result).split(/[,\s]+/)[0]);
-                        
-                        const targetNums = Array.isArray(item.targetDraw.result)
-                          ? item.targetDraw.result
-                          : String(item.targetDraw.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
-                        
-                        const leftHalf = targetNums.slice(0, 5);
-                        const rightHalf = targetNums.slice(5);
-                        
-                        let position = "未出现";
-                        let color = "text-gray-500";
-                        
-                        if (leftHalf.includes(champion)) {
-                          position = "左半区";
-                          color = "text-yellow-400";
-                        } else if (rightHalf.includes(champion)) {
-                          position = "右半区";
-                          color = "text-blue-400";
-                        }
-                        
-                        return (
-                          <div key={idx} className="flex justify-between items-center bg-white/5 p-3 rounded-lg">
-                            <div className="flex flex-col">
-                              <span className="text-xs text-gray-400">{item.label}</span>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-[10px] opacity-50">冠军:</span>
-                                <span className={`w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold text-white ${getNumberColor(String(champion))}`}>
-                                  {champion}
-                                </span>
-                              </div>
-                            </div>
-                            <span className={`font-mono font-bold ${color}`}>{position}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center py-10 opacity-50">
-                    <p className="font-mono text-sm">需要至少50期数据进行对比分析</p>
-                    <p className="text-xs mt-2">当前数据量: {draws.length}</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center opacity-30 text-center">
-                <p className="text-xs font-mono uppercase">等待数据加载...</p>
-              </div>
-            )}
-          </div>
         </section>
       </main>
 
@@ -1949,6 +2631,76 @@ F7::
                     <p className="text-gray-400 italic mt-1">* 数据源自倒数第46期</p>
                     <p className="text-blue-600 font-bold mt-2">策略：6轮倍投 (1-2-4-8-16-32)</p>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono uppercase mb-2 opacity-60 text-emerald-600 font-bold">软件续期 (增加7天)</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Key className="absolute left-3 top-1/2 -translate-y-1/2 opacity-30" size={14} />
+                      <input 
+                        type="password" 
+                        id="extendPassword"
+                        placeholder="输入授权密码..."
+                        className="w-full bg-white border border-[#141414] pl-10 pr-4 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[#141414]"
+                        onKeyDown={async (e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const input = e.target as HTMLInputElement;
+                            const pwd = input.value;
+                            if (!pwd) return;
+                            
+                            if (pwd === 'JH8251050') {
+                                if (currentUser) {
+                                    const users = getLocalUsers();
+                                    const idx = users.findIndex(u => u.username === currentUser.username);
+                                    if (idx !== -1) {
+                                        users[idx].expiry += 7 * 24 * 60 * 60 * 1000;
+                                        saveLocalUsers(users);
+                                        setCurrentUser({...users[idx]});
+                                        sessionStorage.setItem('current_user', JSON.stringify(users[idx]));
+                                        alert('续期成功！增加 7 天');
+                                        input.value = '';
+                                    }
+                                }
+                            } else {
+                                alert('授权密码错误');
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+                    <button 
+                      onClick={async () => {
+                        const input = document.getElementById('extendPassword') as HTMLInputElement;
+                        const pwd = input?.value;
+                        if (!pwd) {
+                          alert('请输入密码');
+                          return;
+                        }
+                        if (pwd === 'JH8251050') {
+                            if (currentUser) {
+                                const users = getLocalUsers();
+                                const idx = users.findIndex(u => u.username === currentUser.username);
+                                if (idx !== -1) {
+                                    users[idx].expiry += 7 * 24 * 60 * 60 * 1000;
+                                    saveLocalUsers(users);
+                                    setCurrentUser({...users[idx]});
+                                    sessionStorage.setItem('current_user', JSON.stringify(users[idx]));
+                                    alert('续期成功！增加 7 天');
+                                    input.value = '';
+                                }
+                            }
+                        } else {
+                            alert('授权密码错误');
+                        }
+                      }}
+                      className="bg-[#141414] text-white px-4 py-2 text-[10px] font-mono uppercase font-bold hover:bg-emerald-600 transition-colors shrink-0"
+                    >
+                      确认续费
+                    </button>
+                  </div>
+                  <p className="text-[9px] text-gray-400 mt-1 font-mono italic">* 输入密码并按回车或点击按钮，每次成功增加 7 天</p>
                 </div>
 
                 <div>
