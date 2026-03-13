@@ -1646,17 +1646,17 @@ F7::
           let recommendedNumbers: number[] = [];
 
           if (index === 0) { // 1st position in 46th
-            // 1, 3, 4, 5名 -> indices 0, 2, 3, 4 from 45th
-            recommendedNumbers = [targetNums45[0], targetNums45[2], targetNums45[3], targetNums45[4]];
-          } else if (index === 9) { // 10th position in 46th
             // 6, 7, 8, 10名 -> indices 5, 6, 7, 9 from 45th
             recommendedNumbers = [targetNums45[5], targetNums45[6], targetNums45[7], targetNums45[9]];
+          } else if (index === 9) { // 10th position in 46th
+            // 1, 3, 4, 5名 -> indices 0, 2, 3, 4 from 45th
+            recommendedNumbers = [targetNums45[0], targetNums45[2], targetNums45[3], targetNums45[4]];
           } else if (index >= 1 && index <= 4) { // Left half (not 1st) in 46th
-            // 2, 3, 4, 5名 -> indices 1, 2, 3, 4 from 45th
-            recommendedNumbers = [targetNums45[1], targetNums45[2], targetNums45[3], targetNums45[4]];
-          } else if (index >= 5 && index <= 8) { // Right half (not 10th) in 46th
             // 6, 7, 8, 9名 -> indices 5, 6, 7, 8 from 45th
             recommendedNumbers = [targetNums45[5], targetNums45[6], targetNums45[7], targetNums45[8]];
+          } else if (index >= 5 && index <= 8) { // Right half (not 10th) in 46th
+            // 2, 3, 4, 5名 -> indices 1, 2, 3, 4 from 45th
+            recommendedNumbers = [targetNums45[1], targetNums45[2], targetNums45[3], targetNums45[4]];
           }
 
           if (recommendedNumbers.length > 0) {
