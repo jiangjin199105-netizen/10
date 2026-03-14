@@ -139,7 +139,8 @@ export default function App() {
   const [expiryModalUser, setExpiryModalUser] = useState<User | null>(null);
 
   const [draws, setDraws] = useState<DrawRecord[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
   const [countdownDuration, setCountdownDuration] = useState<number>(5);
   const [nextDrawTime, setNextDrawTime] = useState<Date>(() => {
     const now = new Date();
@@ -1441,7 +1442,7 @@ F7::
   };
 
   const handleRefresh = useCallback(async (targetUrl: string = url) => {
-    setLoading(true);
+    setDataLoading(true);
     setError(null);
     setLastAttempt(new Date());
     try {
@@ -1502,7 +1503,7 @@ F7::
       console.error(err);
       setError("读取失败");
     } finally {
-      setLoading(false);
+      setDataLoading(false);
     }
   }, [url, draws.length]);
 
@@ -1889,10 +1890,10 @@ F7::
 
             <button 
               type="submit"
-              disabled={loading}
+              disabled={loginLoading}
               className="w-full bg-[#141414] hover:bg-emerald-600 disabled:opacity-50 text-[#E4E3E0] font-bold py-3 transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-sm"
             >
-              {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              {loginLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
               {view === 'login' ? '立即登录' : '立即注册'}
             </button>
           </form>
@@ -2396,11 +2397,11 @@ F7::
             </div>
             <button 
               onClick={() => handleRefresh()}
-              disabled={loading}
+              disabled={dataLoading}
               className="flex items-center gap-2 text-xs font-mono uppercase hover:underline disabled:opacity-50"
             >
-              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-              {loading ? '正在获取...' : '刷新数据'}
+              <RefreshCw size={12} className={dataLoading ? 'animate-spin' : ''} />
+              {dataLoading ? '正在获取...' : '刷新数据'}
             </button>
           </div>
 

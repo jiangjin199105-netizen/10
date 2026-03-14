@@ -40,6 +40,7 @@ async function fetchWithRetry(url: string, retries = 5): Promise<any> {
           'Accept': 'application/json, text/plain, */*',
           'Referer': 'https://api.api168168.com/'
         },
+        httpsAgent,
         timeout: 90000
       });
     } catch (error: any) {
