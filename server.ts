@@ -5,9 +5,15 @@ import * as cheerio from "cheerio";
 import https from "https";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+function logError(message: string) {
+  const logMessage = `[${new Date().toISOString()}] ${message}\n`;
+  fs.appendFileSync(path.join(process.cwd(), 'error.log'), logMessage);
+}
 
 // Global variable to hold the latest recommendation for the script
 let latestRecommendation: { period: string; numbers: number[]; step: number } | null = null;
@@ -25,25 +31,24 @@ const httpsAgent = new https.Agent({
   keepAlive: true,
 });
 
-async function fetchWithRetry(url: string, retries = 3): Promise<any> {
+async function fetchWithRetry(url: string, retries = 5): Promise<any> {
   for (let i = 0; i < retries; i++) {
     try {
       return await axios.get(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-          'Referer': 'https://www.google.com/',
-          'Connection': 'keep-alive',
-          'Cache-Control': 'no-cache'
+          'Accept': 'application/json, text/plain, */*',
+          'Referer': 'https://api.api168168.com/'
         },
-        timeout: 30000,
-        httpsAgent
+        timeout: 90000
       });
     } catch (error: any) {
       if (i === retries - 1) throw error;
-      console.log(`Fetch failed, retrying (${i + 1}/${retries})...`, error.message);
-      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      const msg = `Fetch failed, retrying (${i + 1}/${retries})... ${error.message}`;
+      console.log(msg);
+      logError(msg);
+      // Exponential backoff: 2s, 4s, 8s, 16s
+      await new Promise(resolve => setTimeout(resolve, 2000 * Math.pow(2, i)));
     }
   }
 }
@@ -192,10 +197,30 @@ async function startServer() {
         try {
           const response = await fetchWithRetry(url);
 
-          const $ = cheerio.load(response.data);
+          if (url.includes('api.api168168.com')) {
+            // Specific scraper for api.api168168.com
+            const data = response.data;
+            const list = Array.isArray(data) ? data : (data.result?.data || data.data || []);
+            list.forEach((item: any) => {
+              const period = item.termNum;
+              const result = item.openCode;
+              if (period && result) {
+                const numbers = result.split(',').map((n: string) => n.trim());
+                const sum = numbers.slice(0, 3).reduce((a: number, b: string) => a + (parseInt(b) || 0), 0);
+                addDraw({
+                  period: String(period),
+                  result: numbers.join(', '),
+                  sum,
+                  bigSmall: sum >= 14 ? '大' : '小',
+                  oddEven: sum % 2 === 0 ? '双' : '单'
+                });
+              }
+            });
+          } else {
+            const $ = cheerio.load(response.data);
 
-          // Try to find countdown or next draw time in text
-          const pageText = $.text();
+            // Try to find countdown or next draw time in text
+            const pageText = $.text();
           
           // Pattern 1: "Next Draw: 21301196" followed by a timer "00:20"
           const nextDrawWithTimer = pageText.match(/(?:Next Draw|下期开奖).*?(\d{6,})[\s\S]*?(\d{1,2}):(\d{2})/i);
@@ -250,6 +275,112 @@ async function startServer() {
               if (mins < 6) { // Strictly for 5-min games
                 secondsLeft = mins * 60 + secs;
               }
+            }
+          }
+          
+          // Generic scraper for div-based tables
+          if (drawsMap.size === 0) {
+            $('div').each((_, el) => {
+              const row = $(el);
+              const text = row.text();
+              // Try to find period (usually 6+ digits)
+              const periodMatch = text.match(/\d{6,}/);
+              // Try to find numbers (usually 10 numbers)
+              const numberMatches = text.match(/\d{1,2}/g);
+              
+              if (periodMatch && numberMatches && numberMatches.length >= 10) {
+                const period = periodMatch[0];
+                const numbers = numberMatches.slice(0, 10);
+                const sum = numbers.slice(0, 3).reduce((a, b) => a + (parseInt(b) || 0), 0);
+                addDraw({
+                  period,
+                  result: numbers.join(', '),
+                  sum,
+                  bigSmall: sum >= 14 ? '大' : '小',
+                  oddEven: sum % 2 === 0 ? '双' : '单'
+                });
+              }
+            });
+          }
+          
+          // Specific scraper for the provided structure
+          if ($('#numlist').length > 0) {
+            $('#numlist .listline').each((_, el) => {
+              const row = $(el);
+              const time = row.find('.graytime').eq(0).text().trim();
+              const period = row.find('.graytime').eq(1).text().trim();
+              const numbers: string[] = [];
+              row.find('.haomali li i').each((_, ball) => {
+                numbers.push($(ball).text().trim());
+              });
+
+              if (period && numbers.length >= 10) {
+                const sum = numbers.slice(0, 3).reduce((a, b) => a + (parseInt(b) || 0), 0);
+                addDraw({
+                  period,
+                  result: numbers.join(', '),
+                  sum,
+                  bigSmall: sum >= 14 ? '大' : '小',
+                  oddEven: sum % 2 === 0 ? '双' : '单'
+                });
+              }
+            });
+          }
+          
+          // Specific scraper for eecc168.com
+          if (url.includes('eecc168.com')) {
+            // Try to find table rows or similar structures
+            $('tr').each((_, el) => {
+              const row = $(el);
+              
+              // Try to find period (usually 6+ digits in a td)
+              const period = row.find('td').eq(1).text().trim();
+              
+              // Try to find numbers in ul.imgnumber -> li.numsmXX
+              const numbers: string[] = [];
+              row.find('ul.imgnumber li').each((_, li) => {
+                const className = $(li).attr('class') || '';
+                const match = className.match(/numsm(\d+)/);
+                if (match) {
+                  numbers.push(match[1]);
+                }
+              });
+              
+              if (period && /^\d+$/.test(period) && numbers.length >= 10) {
+                const sum = numbers.slice(0, 3).reduce((a, b) => a + (parseInt(b) || 0), 0);
+                addDraw({
+                  period,
+                  result: numbers.join(', '),
+                  sum,
+                  bigSmall: sum >= 14 ? '大' : '小',
+                  oddEven: sum % 2 === 0 ? '双' : '单'
+                });
+              }
+            });
+            
+            // Fallback: Generic scraper if table structure is different
+            if (drawsMap.size === 0) {
+                $('ul.imgnumber').each((_, ul) => {
+                    const row = $(ul).closest('tr');
+                    const period = row.find('td').eq(1).text().trim();
+                    const numbers: string[] = [];
+                    $(ul).find('li').each((_, li) => {
+                        const className = $(li).attr('class') || '';
+                        const match = className.match(/numsm(\d+)/);
+                        if (match) numbers.push(match[1]);
+                    });
+                    
+                    if (period && /^\d+$/.test(period) && numbers.length >= 10) {
+                        const sum = numbers.slice(0, 3).reduce((a, b) => a + (parseInt(b) || 0), 0);
+                        addDraw({
+                          period,
+                          result: numbers.join(', '),
+                          sum,
+                          bigSmall: sum >= 14 ? '大' : '小',
+                          oddEven: sum % 2 === 0 ? '双' : '单'
+                        });
+                    }
+                });
             }
           }
           
@@ -365,6 +496,7 @@ async function startServer() {
                 }
               }
             });
+          }
           }
         } catch (e) {
           console.error(`Scraping failed for ${url}:`, e.message);

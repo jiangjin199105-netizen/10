@@ -1447,7 +1447,8 @@ F7::
     try {
       // First, check if the server is even reachable
       try {
-        const pingRes = await fetch('/api/ping').catch(() => null);
+      // Local-only mode: skip ping
+      const pingRes = null;
         if (!pingRes) {
           console.warn("Server unreachable via /api/ping");
         }
@@ -1455,6 +1456,7 @@ F7::
         console.error("Ping failed", e);
       }
 
+      // Fetch data from the backend
       const response = await fetch('/api/fetch-draws', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1462,8 +1464,7 @@ F7::
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to fetch data (Status: ${response.status})`);
+        throw new Error('读取失败');
       }
       
       const data = await response.json();
@@ -1495,14 +1496,11 @@ F7::
           }
         }
       } else {
-        // Fallback to mock if no data found but request succeeded
-        if (draws.length === 0) setDraws(generateMockDraws());
-        setError("目标接口/网址未发现数据，正在显示模拟数据。");
+        setError("读取失败");
       }
     } catch (err: any) {
       console.error(err);
-      setError("连接错误，正在显示模拟数据。");
-      if (draws.length === 0) setDraws(generateMockDraws());
+      setError("读取失败");
     } finally {
       setLoading(false);
     }
@@ -1703,11 +1701,13 @@ F7::
             // Voice notification & Macro Helper update
             if (settings.macroHelper) {
               // Post the new recommendation to the server API
+              /*
               fetch('/api/update-recommendation', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ period: nextPeriodStr, numbers: recommendedNumbers, step: bettingStep })
               }).catch(err => console.error("Failed to update recommendation API:", err));
+              */
             }
 
             if (enableVoice && 'speechSynthesis' in window) {
