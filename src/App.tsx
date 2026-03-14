@@ -1469,6 +1469,7 @@ F7::
       }
       
       const data = await response.json();
+      console.log("API response data:", data);
       if (data.draws && data.draws.length > 0) {
         setDraws(data.draws);
         setLastUpdated(new Date());

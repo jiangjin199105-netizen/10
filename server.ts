@@ -201,12 +201,16 @@ async function startServer() {
           if (url.includes('api.api168168.com')) {
             // Specific scraper for api.api168168.com
             const data = response.data;
-            const list = Array.isArray(data) ? data : (data.result?.data || data.data || []);
+            // Handle both the old format and the new format
+            const list = Array.isArray(data) ? data : (data.result?.data || data.data || [data]);
+            
             list.forEach((item: any) => {
-              const period = item.termNum;
-              const result = item.openCode;
+              // Try old format fields first, then new format fields
+              const period = item.termNum || item.preDrawIssue;
+              const result = item.openCode || item.preDrawCode;
+              
               if (period && result) {
-                const numbers = result.split(',').map((n: string) => n.trim());
+                const numbers = String(result).split(',').map((n: string) => n.trim());
                 const sum = numbers.slice(0, 3).reduce((a: number, b: string) => a + (parseInt(b) || 0), 0);
                 addDraw({
                   period: String(period),
@@ -506,9 +510,11 @@ async function startServer() {
 
       // 3. Aggressive fallback: Look for any text patterns
       if (drawsMap.size === 0) {
+        console.log(`No draws found, scraping response data for ${url}`);
         try {
           const response = await axios.get(url).catch(() => null);
           if (response) {
+            console.log("Response data snippet:", response.data.substring(0, 500));
             const $ = cheerio.load(response.data);
             const text = $.text();
             const lines = text.split('\n');
@@ -536,6 +542,8 @@ async function startServer() {
       const finalDraws = Array.from(drawsMap.values())
         .sort((a, b) => b.period.localeCompare(a.period))
         .slice(0, 50);
+      
+      console.log(`Found ${finalDraws.length} draws from ${url}`);
 
       res.json({ 
         draws: finalDraws,
