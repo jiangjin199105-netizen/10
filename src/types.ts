@@ -20,6 +20,7 @@ export interface MacroConfig {
 export interface AppSettings {
   macroHelper: boolean;
   macroConfig?: MacroConfig;
+  autoRefreshInterval: number;
 }
 
 export interface Recommendation {

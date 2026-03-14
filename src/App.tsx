@@ -164,7 +164,7 @@ export default function App() {
     setNextDrawTime(nextBoundary);
     setTimeLeft(differenceInSeconds(nextBoundary, now));
   }, [countdownDuration]);
-  const [url, setUrl] = useState<string>('https://auluckylottery.com/results/lucky-ball-10/');
+  const [url, setUrl] = useState<string>('https://api.api168168.com/pks/getPksHistoryList.do?lotCode=10012');
   const [showSettings, setShowSettings] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [manualData, setManualData] = useState<string>('');
@@ -187,16 +187,20 @@ export default function App() {
   const [lastClearedPeriod, setLastClearedPeriod] = useState<string | null>(() => {
     return localStorage.getItem('lottery_last_cleared_period');
   });
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(15);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // App Settings
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('app_settings');
-    const defaults: AppSettings = { macroHelper: false };
+    const defaults: AppSettings = { macroHelper: false, autoRefreshInterval: 15 };
     const savedSettings = saved ? JSON.parse(saved) : {};
     return { ...defaults, ...savedSettings };
   });
+
+  useEffect(() => {
+    localStorage.setItem('app_settings', JSON.stringify(settings));
+  }, [settings]);
+
   const [macroInfo, setMacroInfo] = useState<{ period: string, numbers: number[] } | null>(null);
 
   // Check expiry and frozen status for current user
@@ -1377,6 +1381,26 @@ F7::
   // Save recommendations to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('lottery_recommendations', JSON.stringify(recommendations));
+    
+    // Always ensure the backend has the latest pending recommendation
+    if (recommendations.length > 0) {
+      const latestRec = recommendations[0];
+      if (latestRec.status === 'pending') {
+        fetch('/api/update-recommendation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            period: latestRec.period, 
+            numbers: latestRec.recommendedNumbers, 
+            step: latestRec.bettingStep || 1 
+          })
+        }).catch(err => console.error("Failed to sync recommendation API:", err));
+      }
+    } else {
+      // Clear the backend recommendation if there are no recommendations
+      fetch('/api/clear-recommendation', { method: 'POST' })
+        .catch(err => console.error("Failed to clear recommendation API:", err));
+    }
   }, [recommendations]);
 
   // Save voice setting
@@ -1515,15 +1539,15 @@ F7::
 
   // Auto-refresh data
   useEffect(() => {
-    if (autoRefreshInterval <= 0) return;
+    if (settings.autoRefreshInterval <= 0) return;
 
-    const intervalTime = autoRefreshInterval * 1000;
+    const intervalTime = settings.autoRefreshInterval * 1000;
     const refreshInterval = setInterval(() => {
       handleRefresh();
     }, intervalTime);
 
     return () => clearInterval(refreshInterval);
-  }, [handleRefresh, autoRefreshInterval]);
+  }, [handleRefresh, settings.autoRefreshInterval]);
 
   // Countdown timer logic
   useEffect(() => {
@@ -1700,18 +1724,7 @@ F7::
             });
             changed = true;
             
-            // Voice notification & Macro Helper update
-            if (settings.macroHelper) {
-              // Post the new recommendation to the server API
-              /*
-              fetch('/api/update-recommendation', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ period: nextPeriodStr, numbers: recommendedNumbers, step: bettingStep })
-              }).catch(err => console.error("Failed to update recommendation API:", err));
-              */
-            }
-
+            // Voice notification
             if (enableVoice && 'speechSynthesis' in window) {
               const utterance = new SpeechSynthesisUtterance(`第${nextPeriodStr.slice(-3)}期推荐已生成，倍投策略第${bettingStep}轮`);
               utterance.lang = 'zh-CN';
@@ -2741,8 +2754,8 @@ F7::
                       <RefreshCw className="absolute left-3 top-1/2 -translate-y-1/2 opacity-30" size={14} />
                       <input 
                         type="number" 
-                        value={autoRefreshInterval}
-                        onChange={(e) => setAutoRefreshInterval(Math.max(5, parseInt(e.target.value) || 15))}
+                        value={settings.autoRefreshInterval}
+                        onChange={(e) => setSettings(s => ({ ...s, autoRefreshInterval: Math.max(5, parseInt(e.target.value) || 15) }))}
                         className="w-full bg-white border border-[#141414] pl-10 pr-4 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[#141414]"
                       />
                     </div>

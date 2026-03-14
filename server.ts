@@ -31,25 +31,26 @@ const httpsAgent = new https.Agent({
   keepAlive: true,
 });
 
-async function fetchWithRetry(url: string, retries = 5): Promise<any> {
+async function fetchWithRetry(url: string, retries = 3): Promise<any> {
+  const urlObj = new URL(url);
   for (let i = 0; i < retries; i++) {
     try {
       return await axios.get(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
           'Accept': 'application/json, text/plain, */*',
-          'Referer': 'https://api.api168168.com/'
+          'Referer': urlObj.origin + '/'
         },
         httpsAgent,
-        timeout: 90000
+        timeout: 30000 // 30 seconds
       });
     } catch (error: any) {
       if (i === retries - 1) throw error;
       const msg = `Fetch failed, retrying (${i + 1}/${retries})... ${error.message}`;
       console.log(msg);
       logError(msg);
-      // Exponential backoff: 2s, 4s, 8s, 16s
-      await new Promise(resolve => setTimeout(resolve, 2000 * Math.pow(2, i)));
+      // Exponential backoff: 3s, 6s
+      await new Promise(resolve => setTimeout(resolve, 3000 * Math.pow(2, i)));
     }
   }
 }
@@ -164,13 +165,20 @@ async function startServer() {
   // API for the client to post the latest recommendation
   app.post("/api/update-recommendation", (req, res) => {
     const { period, numbers, step } = req.body;
-    if (period && Array.isArray(numbers) && step) {
+    if (period && Array.isArray(numbers) && step !== undefined) {
       latestRecommendation = { period, numbers, step };
       console.log("Updated recommendation via API:", latestRecommendation);
       res.status(200).json({ message: "Recommendation updated" });
     } else {
       res.status(400).json({ error: "Invalid data format" });
     }
+  });
+
+  // API to clear the latest recommendation
+  app.post("/api/clear-recommendation", (req, res) => {
+    latestRecommendation = null;
+    console.log("Cleared recommendation via API");
+    res.status(200).json({ message: "Recommendation cleared" });
   });
 
   // API to fetch draw records from a URL
@@ -194,13 +202,15 @@ async function startServer() {
       };
       
       // Scraping is now the primary source
+      let responseData: any = null;
       if (true) { // Keeping structure for clarity
         try {
           const response = await fetchWithRetry(url);
+          responseData = response.data;
 
           if (url.includes('api.api168168.com')) {
             // Specific scraper for api.api168168.com
-            const data = response.data;
+            const data = responseData;
             // Handle both the old format and the new format
             const list = Array.isArray(data) ? data : (data.result?.data || data.data || [data]);
             
@@ -222,7 +232,7 @@ async function startServer() {
               }
             });
           } else {
-            const $ = cheerio.load(response.data);
+            const $ = cheerio.load(responseData);
 
             // Try to find countdown or next draw time in text
             const pageText = $.text();
@@ -509,13 +519,12 @@ async function startServer() {
       }
 
       // 3. Aggressive fallback: Look for any text patterns
-      if (drawsMap.size === 0) {
+      if (drawsMap.size === 0 && responseData) {
         console.log(`No draws found, scraping response data for ${url}`);
         try {
-          const response = await axios.get(url).catch(() => null);
-          if (response) {
-            console.log("Response data snippet:", response.data.substring(0, 500));
-            const $ = cheerio.load(response.data);
+          if (typeof responseData === 'string') {
+            console.log("Response data snippet:", responseData.substring(0, 500));
+            const $ = cheerio.load(responseData);
             const text = $.text();
             const lines = text.split('\n');
             lines.forEach(line => {
