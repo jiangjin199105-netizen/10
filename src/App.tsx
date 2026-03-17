@@ -192,7 +192,7 @@ export default function App() {
   // App Settings
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('app_settings');
-    const defaults: AppSettings = { macroHelper: false, autoRefreshInterval: 15, bettingRounds: 6 };
+    const defaults: AppSettings = { macroHelper: false, autoRefreshInterval: 15, bettingRounds: 6, predictionLogic: 'logic1' };
     const savedSettings = saved ? JSON.parse(saved) : {};
     return { ...defaults, ...savedSettings };
   });
@@ -332,7 +332,13 @@ UserVar BetStep3=4 "【策略】第3轮倍数"
 UserVar BetStep4=8 "【策略】第4轮倍数"
 UserVar BetStep5=16 "【策略】第5轮倍数"
 UserVar BetStep6=32 "【策略】第6轮倍数"
-UserVar MaxRounds=6 "【策略】倍投轮数 (4或6)"
+UserVar BetStep7=64 "【策略】第7轮倍数"
+UserVar BetStep8=128 "【策略】第8轮倍数"
+UserVar BetStep9=256 "【策略】第9轮倍数"
+UserVar BetStep10=512 "【策略】第10轮倍数"
+UserVar BetStep11=1024 "【策略】第11轮倍数"
+UserVar BetStep12=2048 "【策略】第12轮倍数"
+UserVar MaxRounds=6 "【策略】倍投轮数 (4, 6, 9 或 12)"
 
 ' ///////////////////////////// 【可视化界面代码结束】 //////////////////////////////////////
 ' ///////////////////////////////////////////////////////////////////////////////////////////
@@ -454,13 +460,21 @@ Loop
 ' --- 辅助函数: 获取对应轮次的金额 ---
 Function GetBetAmount(stepNum)
     Dim amt
-    If CInt(stepNum) = 1 Then amt = BetStep1
-    If CInt(stepNum) = 2 Then amt = BetStep2
-    If CInt(stepNum) = 3 Then amt = BetStep3
-    If CInt(stepNum) = 4 Then amt = BetStep4
-    If CInt(stepNum) = 5 Then amt = BetStep5
-    If CInt(stepNum) = 6 Then amt = BetStep6
-    If CInt(stepNum) < 1 Or CInt(stepNum) > 6 Then amt = BetStep1
+    Select Case CInt(stepNum)
+        Case 1: amt = BetStep1
+        Case 2: amt = BetStep2
+        Case 3: amt = BetStep3
+        Case 4: amt = BetStep4
+        Case 5: amt = BetStep5
+        Case 6: amt = BetStep6
+        Case 7: amt = BetStep7
+        Case 8: amt = BetStep8
+        Case 9: amt = BetStep9
+        Case 10: amt = BetStep10
+        Case 11: amt = BetStep11
+        Case 12: amt = BetStep12
+        Case Else: amt = BetStep1
+    End Select
     GetBetAmount = CInt(amt)
 End Function
 
@@ -519,6 +533,11 @@ End Sub
 Sub PlaceBet(handle, numbersStr, stepNum)
     Dim BetAmount
     BetAmount = GetBetAmount(stepNum)
+    
+    If BetAmount = 0 Then
+        UpdateMonitor "跳过下注", "当前轮次金额为 0", "跳过第 " & stepNum & " 轮"
+        Exit Sub
+    End If
 
     If CInt(ClickMode) = 1 Then
         UpdateMonitor "执行下注", "正在激活窗口(前台)...", "开始第 " & stepNum & " 轮, 倍数: " & BetAmount
@@ -624,8 +643,8 @@ Coords["Key0"] := [944, 842, 1], Coords["Key1"] := [785, 626, 1], Coords["Key2"]
 Coords["Key4"] := [799, 700, 1], Coords["Key5"] := [951, 695, 1], Coords["Key6"] := [1086, 695, 1], Coords["Key7"] := [781, 769, 1]
 Coords["Key8"] := [932, 773, 1], Coords["Key9"] := [1073, 767, 1], Coords["KeyReturn"] := [1215, 900, 1]
 
-; 倍投策略 (6轮)
-global BetSteps := [10, 20, 40, 80, 160, 320]
+; 倍投策略 (12轮)
+global BetSteps := [10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480]
 global MaxRounds := 6
 
 ; ==============================================================================
@@ -662,29 +681,33 @@ MyGui.Add("Button", "x240 y150 w100 vBtnConfig", "坐标配置").OnEvent("Click"
 MyGui["BtnStop"].Enabled := false
 
 MyGui.Add("Text", "x10 y190 w380", "运行日志:")
-global LogEdit := MyGui.Add("Edit", "x10 y210 w430 h240 ReadOnly vLogOutput")
+global LogEdit := MyGui.Add("Edit", "x10 y210 w430 h220 ReadOnly vLogOutput")
 
 MyGui.Add("Text", "x10 y445 w80", "倍投轮数:")
 MyGui.Add("Radio", "x90 y442 w60 vRounds4", "4 轮").OnEvent("Click", (*) => ChangeRounds(4))
 MyGui.Add("Radio", "x160 y442 w60 vRounds6 Checked", "6 轮").OnEvent("Click", (*) => ChangeRounds(6))
+MyGui.Add("Radio", "x230 y442 w60 vRounds9", "9 轮").OnEvent("Click", (*) => ChangeRounds(9))
+MyGui.Add("Radio", "x300 y442 w60 vRounds12", "12 轮").OnEvent("Click", (*) => ChangeRounds(12))
 
-MyGui.Add("GroupBox", "x10 y465 w430 h60", "倍投金额配置")
+MyGui.Add("GroupBox", "x10 y470 w430 h100", "倍投金额配置")
 global EditSteps := []
-Loop 6 {
-    EditSteps.Push(MyGui.Add("Edit", "x" (20 + (A_Index-1)*70) " y" 490 " w60 vStep" A_Index, BetSteps[A_Index]))
+Loop 12 {
+    col := Mod(A_Index - 1, 6)
+    row := (A_Index - 1) // 6
+    EditSteps.Push(MyGui.Add("Edit", "x" (20 + col*70) " y" (495 + row*30) " w60 vStep" A_Index, BetSteps[A_Index]))
 }
-MyGui.Add("Button", "x10 y535 w430 h30 vBtnSave", "保存金额配置").OnEvent("Click", SaveBetSteps)
+MyGui.Add("Button", "x10 y580 w430 h30 vBtnSave", "保存金额配置").OnEvent("Click", SaveBetSteps)
 
 ChangeRounds(n) {
     global MaxRounds := n
-    Loop 6 {
+    Loop 12 {
         MyGui["Step" A_Index].Enabled := (A_Index <= n)
     }
     AddLog("倍投轮数已切换为: " n " 轮")
 }
 
 MyGui.OnEvent("Close", (*) => ExitApp())
-MyGui.Show("w450 h580")
+MyGui.Show("w450 h630")
 
 ; ==============================================================================
 ; 坐标配置窗口 (Coordinate Configuration GUI)
@@ -1014,12 +1037,12 @@ CaptureWindow(*)
 SaveBetSteps(*)
 {
     global BetSteps
-    Loop 6 {
+    Loop 12 {
         val := MyGui["Step" A_Index].Value
         if IsNumber(val)
             BetSteps[A_Index] := Number(val)
     }
-    AddLog("倍投金额配置已保存: [" BetSteps[1] ", " BetSteps[2] ", " BetSteps[3] ", " BetSteps[4] ", " BetSteps[5] ", " BetSteps[6] "]")
+    AddLog("倍投金额配置已保存")
     MsgBox "倍投金额配置已保存！", "成功", "Iconi"
 }
 
@@ -1032,12 +1055,11 @@ StartScript(*)
     }
     
     ; 同步 GUI 中的倍投金额
-    Loop 6 {
+    Loop 12 {
         val := MyGui["Step" A_Index].Value
         if IsNumber(val)
             BetSteps[A_Index] := Number(val)
     }
-    AddLog("当前倍投序列: [" BetSteps[1] ", " BetSteps[2] ", " BetSteps[3] ", " BetSteps[4] ", " BetSteps[5] ", " BetSteps[6] "]")
     
     IsRunning := true
     MyGui["BtnStart"].Enabled := false
@@ -1154,6 +1176,12 @@ PlaceBet(hwnd, numbersStr, stepNum)
     global BetSteps, Coords
     
     betAmount := BetSteps[stepNum]
+    
+    if (betAmount == 0) {
+        AddLog("当前轮次金额为 0，跳过下注。")
+        return
+    }
+
     mode := MyGui["ClickMode"].Text ; 获取选中的文本，例如 "前台点击"
     
     if (mode == "前台点击") {
@@ -1649,77 +1677,125 @@ F7::
         // 3rd (draws[2]) vs 5th (draws[4])
         // Latest (draws[0]) vs 3rd (draws[2])
 
-        const getPosition = (championDraw: DrawRecord, targetDraw: DrawRecord) => {
-          const champion = Array.isArray(championDraw.result) 
-            ? championDraw.result[0] 
-            : parseInt(String(championDraw.result).split(/[,\s]+/)[0]);
-          
-          const targetNums = Array.isArray(targetDraw.result)
-            ? targetDraw.result
-            : String(targetDraw.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
-          
-          const leftHalf = targetNums.slice(0, 5);
-          const rightHalf = targetNums.slice(5);
-
-          if (leftHalf.includes(champion)) return 'left';
-          if (rightHalf.includes(champion)) return 'right';
-          return 'none';
-        };
-
-        const p2 = getPosition(draws[1], draws[3]);
-        const p3 = getPosition(draws[2], draws[4]);
-        const p1 = getPosition(draws[0], draws[2]);
-
+        let recommendedNumbers: number[] = [];
         let patternType = '';
-        if (p2 === 'left' && p3 === 'left' && p1 === 'right') {
-          patternType = 'Left-Right';
-        } else if (p2 === 'right' && p3 === 'right' && p1 === 'left') {
-          patternType = 'Right-Left';
-        }
 
-        if (patternType) {
-          // Generate Prediction
-          // Source: draws[1]
-          // Key: draws[0].champion
-          // Position Check: draws[2]
-          const champion = Array.isArray(draws[0].result) 
-            ? draws[0].result[0] 
-            : parseInt(String(draws[0].result).split(/[,\s]+/)[0]);
-          
-          // Check position in 3rd draw
-          const targetDraw2 = draws[2];
-          const targetNums2 = Array.isArray(targetDraw2.result)
-            ? targetDraw2.result
-            : String(targetDraw2.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
-          
-          const index = targetNums2.indexOf(champion); // 0-based index in 3rd draw
+        if (settings.predictionLogic === 'logic1') {
+          const getPosition = (championDraw: DrawRecord, targetDraw: DrawRecord) => {
+            const champion = Array.isArray(championDraw.result) 
+              ? championDraw.result[0] 
+              : parseInt(String(championDraw.result).split(/[,\s]+/)[0]);
+            
+            const targetNums = Array.isArray(targetDraw.result)
+              ? targetDraw.result
+              : String(targetDraw.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
+            
+            const leftHalf = targetNums.slice(0, 5);
+            const rightHalf = targetNums.slice(5);
 
-          // Pick numbers from 2nd draw
-          const targetDraw1 = draws[1];
-          const targetNums1 = Array.isArray(targetDraw1.result)
-            ? targetDraw1.result
-            : String(targetDraw1.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
+            if (leftHalf.includes(champion)) return 'left';
+            if (rightHalf.includes(champion)) return 'right';
+            return 'none';
+          };
 
-          let recommendedNumbers: number[] = [];
+          const p2 = getPosition(draws[1], draws[3]);
+          const p3 = getPosition(draws[2], draws[4]);
+          const p1 = getPosition(draws[0], draws[2]);
 
-          if (index === 0) { // 1st position in 3rd
-            // 1, 3, 4, 5名 -> indices 0, 2, 3, 4 from 2nd
-            recommendedNumbers = [targetNums1[0], targetNums1[2], targetNums1[3], targetNums1[4]];
-          } else if (index === 9) { // 10th position in 3rd
-            // 6, 7, 8, 10名 -> indices 5, 6, 7, 9 from 2nd
-            recommendedNumbers = [targetNums1[5], targetNums1[6], targetNums1[7], targetNums1[9]];
-          } else if (index >= 1 && index <= 4) { // Left half (not 1st) in 3rd
-            // 2, 3, 4, 5名 -> indices 1, 2, 3, 4 from 2nd
-            recommendedNumbers = [targetNums1[1], targetNums1[2], targetNums1[3], targetNums1[4]];
-          } else if (index >= 5 && index <= 8) { // Right half (not 10th) in 3rd
-            // 6, 7, 8, 9名 -> indices 5, 6, 7, 8 from 2nd
-            recommendedNumbers = [targetNums1[5], targetNums1[6], targetNums1[7], targetNums1[8]];
+          if (p2 === 'left' && p3 === 'left' && p1 === 'right') {
+            patternType = 'Left-Right';
+          } else if (p2 === 'right' && p3 === 'right' && p1 === 'left') {
+            patternType = 'Right-Left';
           }
 
-          if (recommendedNumbers.length > 0) {
-            // Calculate betting step
-            let bettingStep = 1;
-            const lastRec = newRecs.find(r => r.status !== 'pending'); // Find the most recent completed recommendation
+          if (patternType) {
+            const champion = Array.isArray(draws[0].result) 
+              ? draws[0].result[0] 
+              : parseInt(String(draws[0].result).split(/[,\s]+/)[0]);
+            
+            const targetDraw2 = draws[2];
+            const targetNums2 = Array.isArray(targetDraw2.result)
+              ? targetDraw2.result
+              : String(targetDraw2.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
+            
+            const index = targetNums2.indexOf(champion);
+
+            const targetDraw1 = draws[1];
+            const targetNums1 = Array.isArray(targetDraw1.result)
+              ? targetDraw1.result
+              : String(targetDraw1.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
+
+            if (index === 0) {
+              recommendedNumbers = [targetNums1[0], targetNums1[2], targetNums1[3], targetNums1[4]];
+            } else if (index === 9) {
+              recommendedNumbers = [targetNums1[5], targetNums1[6], targetNums1[7], targetNums1[9]];
+            } else if (index >= 1 && index <= 4) {
+              recommendedNumbers = [targetNums1[1], targetNums1[2], targetNums1[3], targetNums1[4]];
+            } else if (index >= 5 && index <= 8) {
+              recommendedNumbers = [targetNums1[5], targetNums1[6], targetNums1[7], targetNums1[8]];
+            }
+          }
+        } else if (settings.predictionLogic === 'logic2') {
+          const getPosition = (championDraw: DrawRecord, targetDraw: DrawRecord) => {
+            const champion = Array.isArray(championDraw.result) 
+              ? championDraw.result[0] 
+              : parseInt(String(championDraw.result).split(/[,\s]+/)[0]);
+            
+            const targetNums = Array.isArray(targetDraw.result)
+              ? targetDraw.result
+              : String(targetDraw.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
+            
+            const leftHalf = targetNums.slice(0, 5);
+            const rightHalf = targetNums.slice(5);
+
+            if (leftHalf.includes(champion)) return 'left';
+            if (rightHalf.includes(champion)) return 'right';
+            return 'none';
+          };
+
+          const p2 = getPosition(draws[1], draws[3]);
+          const p3 = getPosition(draws[2], draws[4]);
+          const p1 = getPosition(draws[0], draws[2]);
+
+          if (p2 === 'left' && p3 === 'left' && p1 === 'right') {
+            patternType = 'Left-Right';
+          } else if (p2 === 'right' && p3 === 'right' && p1 === 'left') {
+            patternType = 'Right-Left';
+          }
+
+          if (patternType) {
+            const champion = Array.isArray(draws[0].result) 
+              ? draws[0].result[0] 
+              : parseInt(String(draws[0].result).split(/[,\s]+/)[0]);
+            
+            const targetDraw2 = draws[2];
+            const targetNums2 = Array.isArray(targetDraw2.result)
+              ? targetDraw2.result
+              : String(targetDraw2.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
+            
+            const index = targetNums2.indexOf(champion);
+
+            const targetDraw1 = draws[1];
+            const targetNums1 = Array.isArray(targetDraw1.result)
+              ? targetDraw1.result
+              : String(targetDraw1.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
+
+            if (index === 0) { // Situation A: 1st position
+              recommendedNumbers = [targetNums1[5], targetNums1[6], targetNums1[7], targetNums1[9]];
+            } else if (index === 9) { // Situation B: 10th position
+              recommendedNumbers = [targetNums1[0], targetNums1[2], targetNums1[3], targetNums1[4]];
+            } else if (index >= 1 && index <= 4) { // Situation C: Left half (not 1st)
+              recommendedNumbers = [targetNums1[5], targetNums1[6], targetNums1[7], targetNums1[8]];
+            } else if (index >= 5 && index <= 8) { // Situation D: Right half (not 10th)
+              recommendedNumbers = [targetNums1[1], targetNums1[2], targetNums1[3], targetNums1[4]];
+            }
+          }
+        }
+
+        if (recommendedNumbers.length > 0) {
+          // Calculate betting step
+          let bettingStep = 1;
+          const lastRec = newRecs.find(r => r.status !== 'pending');
             
             if (lastRec) {
               if (lastRec.status === 'lost') {
@@ -1752,11 +1828,10 @@ F7::
             }
           }
         }
-      }
 
-      return changed ? newRecs : prev;
-    });
-  }, [draws]);
+        return changed ? newRecs : prev;
+      });
+    }, [draws, settings.bettingRounds, settings.predictionLogic, enableVoice, lastClearedPeriod]);
 
   const handleDownload = () => {
     if (recommendations.length === 0) return;
@@ -2567,6 +2642,12 @@ F7::
                               rec.bettingStep === 3 ? 'bg-purple-100 text-purple-700' :
                               rec.bettingStep === 4 ? 'bg-orange-100 text-orange-700' :
                               rec.bettingStep === 5 ? 'bg-red-100 text-red-700' :
+                              rec.bettingStep === 6 ? 'bg-pink-100 text-pink-700' :
+                              rec.bettingStep === 7 ? 'bg-indigo-100 text-indigo-700' :
+                              rec.bettingStep === 8 ? 'bg-teal-100 text-teal-700' :
+                              rec.bettingStep === 9 ? 'bg-cyan-100 text-cyan-700' :
+                              rec.bettingStep === 10 ? 'bg-amber-100 text-amber-700' :
+                              rec.bettingStep === 11 ? 'bg-lime-100 text-lime-700' :
                               'bg-rose-900 text-white'
                             }`}>
                               第{rec.bettingStep}轮
@@ -2813,14 +2894,34 @@ F7::
 
                 {/* Betting Strategy Settings */}
                 <div className="pt-4 border-t border-[#141414]/10">
+                  <h3 className="font-serif font-bold italic text-base mb-3">推荐逻辑设置</h3>
+                  <div className="flex items-center gap-4 mb-4">
+                    <span className="text-xs font-mono">预测逻辑:</span>
+                    <div className="flex bg-gray-100 p-1 rounded-lg">
+                      {['logic1', 'logic2'].map((l) => (
+                        <button
+                          key={l}
+                          onClick={() => setSettings(s => ({ ...s, predictionLogic: l as 'logic1' | 'logic2' }))}
+                          className={`px-4 py-1 text-xs font-mono rounded-md transition-all ${
+                            settings.predictionLogic === l
+                              ? 'bg-[#141414] text-[#E4E3E0] shadow-md'
+                              : 'text-gray-500 hover:text-[#141414]'
+                          }`}
+                        >
+                          {l === 'logic1' ? '逻辑 1' : '逻辑 2'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <h3 className="font-serif font-bold italic text-base mb-3">倍投策略设置</h3>
                   <div className="flex items-center gap-4">
                     <span className="text-xs font-mono">倍投轮数:</span>
                     <div className="flex bg-gray-100 p-1 rounded-lg">
-                      {[4, 6].map((rounds) => (
+                      {[4, 6, 9, 12].map((rounds) => (
                         <button
                           key={rounds}
-                          onClick={() => setSettings(s => ({ ...s, bettingRounds: rounds as 4 | 6 }))}
+                          onClick={() => setSettings(s => ({ ...s, bettingRounds: rounds as 4 | 6 | 9 | 12 }))}
                           className={`px-4 py-1 text-xs font-mono rounded-md transition-all ${
                             settings.bettingRounds === rounds
                               ? 'bg-[#141414] text-[#E4E3E0] shadow-md'
@@ -2832,7 +2933,7 @@ F7::
                       ))}
                     </div>
                     <span className="text-[10px] text-gray-400 font-mono">
-                      (当前: {settings.bettingRounds === 4 ? '10-20-40-80' : '10-20-40-80-160-320'})
+                      (当前: {settings.bettingRounds === 4 ? '10-20-40-80' : settings.bettingRounds === 6 ? '10-20-40-80-160-320' : settings.bettingRounds === 9 ? '9轮倍投模式' : '12轮倍投模式'})
                     </span>
                   </div>
                 </div>

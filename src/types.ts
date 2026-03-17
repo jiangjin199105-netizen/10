@@ -21,7 +21,8 @@ export interface AppSettings {
   macroHelper: boolean;
   macroConfig?: MacroConfig;
   autoRefreshInterval: number;
-  bettingRounds: 4 | 6;
+  bettingRounds: 4 | 6 | 9 | 12;
+  predictionLogic: 'logic1' | 'logic2';
 }
 
 export interface Recommendation {
