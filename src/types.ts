@@ -21,6 +21,7 @@ export interface AppSettings {
   macroHelper: boolean;
   macroConfig?: MacroConfig;
   autoRefreshInterval: number;
+  bettingRounds: 4 | 6;
 }
 
 export interface Recommendation {
@@ -31,6 +32,6 @@ export interface Recommendation {
   actualChampion?: number;
   patternType: string;
   createTime: number;
-  bettingStep: number; // 1, 2, 3, 4
+  bettingStep: number; // Current step in the betting sequence (e.g., 1-4 or 1-6)
   profit?: number;
 }
