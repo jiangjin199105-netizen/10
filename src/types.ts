@@ -22,7 +22,7 @@ export interface AppSettings {
   macroConfig?: MacroConfig;
   autoRefreshInterval: number;
   bettingRounds: 4 | 6 | 9 | 12;
-  predictionLogic: 'logic1' | 'logic2';
+  predictionLogic: 'logic1' | 'logic2' | 'logic3';
 }
 
 export interface Recommendation {

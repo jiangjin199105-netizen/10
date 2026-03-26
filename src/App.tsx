@@ -1660,7 +1660,7 @@ F7::
           // Step 3: Bet 40/num -> Cost 160. Prize 396.
           // Step 4: Bet 80/num -> Cost 320. Prize 792.
           const baseBet = 10 * Math.pow(2, (rec.bettingStep || 1) - 1);
-          const cost = baseBet * 4;
+          const cost = baseBet * rec.recommendedNumbers.length;
           const prize = isWon ? (baseBet * 9.9) : 0;
           rec.profit = prize - cost;
 
@@ -1680,35 +1680,46 @@ F7::
         let recommendedNumbers: number[] = [];
         let patternType = '';
 
-        if (settings.predictionLogic === 'logic1') {
-          const getPosition = (championDraw: DrawRecord, targetDraw: DrawRecord) => {
-            const champion = Array.isArray(championDraw.result) 
-              ? championDraw.result[0] 
-              : parseInt(String(championDraw.result).split(/[,\s]+/)[0]);
-            
-            const targetNums = Array.isArray(targetDraw.result)
-              ? targetDraw.result
-              : String(targetDraw.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
-            
-            const leftHalf = targetNums.slice(0, 5);
-            const rightHalf = targetNums.slice(5);
+        const getPosition = (championDraw: DrawRecord, targetDraw: DrawRecord) => {
+          const champion = Array.isArray(championDraw.result) 
+            ? championDraw.result[0] 
+            : parseInt(String(championDraw.result).split(/[,\s]+/)[0]);
+          
+          const targetNums = Array.isArray(targetDraw.result)
+            ? targetDraw.result
+            : String(targetDraw.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
+          
+          const leftHalf = targetNums.slice(0, 5);
+          const rightHalf = targetNums.slice(5);
 
-            if (leftHalf.includes(champion)) return 'left';
-            if (rightHalf.includes(champion)) return 'right';
-            return 'none';
-          };
+          if (leftHalf.includes(champion)) return 'left';
+          if (rightHalf.includes(champion)) return 'right';
+          return 'none';
+        };
 
-          const p2 = getPosition(draws[1], draws[3]);
-          const p3 = getPosition(draws[2], draws[4]);
-          const p1 = getPosition(draws[0], draws[2]);
+        const p2 = getPosition(draws[1], draws[3]);
+        const p3 = getPosition(draws[2], draws[4]);
+        const p1 = getPosition(draws[0], draws[2]);
 
-          if (p2 === 'left' && p3 === 'left' && p1 === 'right') {
-            patternType = 'Left-Right';
-          } else if (p2 === 'right' && p3 === 'right' && p1 === 'left') {
-            patternType = 'Right-Left';
-          }
+        if (p2 === 'left' && p3 === 'left' && p1 === 'right') {
+          patternType = 'Left-Right';
+        } else if (p2 === 'right' && p3 === 'right' && p1 === 'left') {
+          patternType = 'Right-Left';
+        }
 
-          if (patternType) {
+        const lastRec = newRecs.find(r => r.status !== 'pending');
+        const isContinuing = lastRec && lastRec.status === 'lost' && lastRec.bettingStep < settings.bettingRounds;
+
+        let shouldGenerate = false;
+        if (patternType) {
+          shouldGenerate = true;
+        } else if (settings.predictionLogic === 'logic3' && isContinuing) {
+          shouldGenerate = true;
+          patternType = lastRec.patternType;
+        }
+
+        if (shouldGenerate) {
+          if (settings.predictionLogic === 'logic1') {
             const champion = Array.isArray(draws[0].result) 
               ? draws[0].result[0] 
               : parseInt(String(draws[0].result).split(/[,\s]+/)[0]);
@@ -1734,36 +1745,7 @@ F7::
             } else if (index >= 5 && index <= 8) {
               recommendedNumbers = [targetNums1[5], targetNums1[6], targetNums1[7], targetNums1[8]];
             }
-          }
-        } else if (settings.predictionLogic === 'logic2') {
-          const getPosition = (championDraw: DrawRecord, targetDraw: DrawRecord) => {
-            const champion = Array.isArray(championDraw.result) 
-              ? championDraw.result[0] 
-              : parseInt(String(championDraw.result).split(/[,\s]+/)[0]);
-            
-            const targetNums = Array.isArray(targetDraw.result)
-              ? targetDraw.result
-              : String(targetDraw.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
-            
-            const leftHalf = targetNums.slice(0, 5);
-            const rightHalf = targetNums.slice(5);
-
-            if (leftHalf.includes(champion)) return 'left';
-            if (rightHalf.includes(champion)) return 'right';
-            return 'none';
-          };
-
-          const p2 = getPosition(draws[1], draws[3]);
-          const p3 = getPosition(draws[2], draws[4]);
-          const p1 = getPosition(draws[0], draws[2]);
-
-          if (p2 === 'left' && p3 === 'left' && p1 === 'right') {
-            patternType = 'Left-Right';
-          } else if (p2 === 'right' && p3 === 'right' && p1 === 'left') {
-            patternType = 'Right-Left';
-          }
-
-          if (patternType) {
+          } else if (settings.predictionLogic === 'logic2') {
             const champion = Array.isArray(draws[0].result) 
               ? draws[0].result[0] 
               : parseInt(String(draws[0].result).split(/[,\s]+/)[0]);
@@ -1789,49 +1771,93 @@ F7::
             } else if (index >= 5 && index <= 8) { // Situation D: Right half (not 10th)
               recommendedNumbers = [targetNums1[1], targetNums1[2], targetNums1[3], targetNums1[4]];
             }
+          } else if (settings.predictionLogic === 'logic3') {
+            if (newRecs.length === 0) {
+              const champion = Array.isArray(draws[0].result) 
+                ? draws[0].result[0] 
+                : parseInt(String(draws[0].result).split(/[,\s]+/)[0]);
+              
+              const targetDraw2 = draws[2];
+              const targetNums2 = Array.isArray(targetDraw2.result)
+                ? targetDraw2.result
+                : String(targetDraw2.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
+              
+              const index = targetNums2.indexOf(champion);
+
+              const targetDraw1 = draws[1];
+              const targetNums1 = Array.isArray(targetDraw1.result)
+                ? targetDraw1.result
+                : String(targetDraw1.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
+
+              if (index === 0) {
+                recommendedNumbers = [targetNums1[0], targetNums1[2], targetNums1[3], targetNums1[4]];
+              } else if (index === 9) {
+                recommendedNumbers = [targetNums1[5], targetNums1[6], targetNums1[7], targetNums1[9]];
+              } else if (index >= 1 && index <= 4) {
+                recommendedNumbers = [targetNums1[1], targetNums1[2], targetNums1[3], targetNums1[4]];
+              } else if (index >= 5 && index <= 8) {
+                recommendedNumbers = [targetNums1[5], targetNums1[6], targetNums1[7], targetNums1[8]];
+              }
+            } else {
+              const champion = Array.isArray(draws[0].result) 
+                ? draws[0].result[0] 
+                : parseInt(String(draws[0].result).split(/[,\s]+/)[0]);
+              
+              const calcNum = (num: number) => {
+                let res = num % 10;
+                if (res <= 0) res += 10;
+                return res;
+              };
+
+              const nums = [
+                calcNum(champion),
+                calcNum(champion + 4),
+                calcNum(champion + 6),
+                calcNum(champion + 8)
+              ];
+              recommendedNumbers = Array.from(new Set(nums)).sort((a, b) => a - b);
+            }
           }
         }
 
         if (recommendedNumbers.length > 0) {
           // Calculate betting step
           let bettingStep = 1;
-          const lastRec = newRecs.find(r => r.status !== 'pending');
-            
-            if (lastRec) {
-              if (lastRec.status === 'lost') {
-                if (lastRec.bettingStep < settings.bettingRounds) {
-                  bettingStep = lastRec.bettingStep + 1;
-                } else {
-                  bettingStep = 1; // Reset after max losses
-                }
+          if (lastRec) {
+            if (lastRec.status === 'lost') {
+              if (lastRec.bettingStep < settings.bettingRounds) {
+                bettingStep = lastRec.bettingStep + 1;
               } else {
-                bettingStep = 1; // Reset after win
+                bettingStep = 1; // Reset after max losses
               }
-            }
-
-            newRecs.unshift({
-              period: nextPeriodStr,
-              basedOnPeriod: latestDraw.period,
-              recommendedNumbers,
-              status: 'pending',
-              patternType,
-              createTime: Date.now(),
-              bettingStep
-            });
-            changed = true;
-            
-            // Voice notification
-            if (enableVoice && 'speechSynthesis' in window) {
-              const utterance = new SpeechSynthesisUtterance(`第${nextPeriodStr.slice(-3)}期推荐已生成，倍投策略第${bettingStep}轮`);
-              utterance.lang = 'zh-CN';
-              window.speechSynthesis.speak(utterance);
+            } else {
+              bettingStep = 1; // Reset after win
             }
           }
-        }
 
-        return changed ? newRecs : prev;
-      });
-    }, [draws, settings.bettingRounds, settings.predictionLogic, enableVoice, lastClearedPeriod]);
+          newRecs.unshift({
+            period: nextPeriodStr,
+            basedOnPeriod: latestDraw.period,
+            recommendedNumbers,
+            status: 'pending',
+            patternType,
+            createTime: Date.now(),
+            bettingStep
+          });
+          changed = true;
+          
+          // Voice notification
+          if (enableVoice && 'speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(`第${nextPeriodStr.slice(-3)}期推荐已生成，倍投策略第${bettingStep}轮`);
+            utterance.lang = 'zh-CN';
+            window.speechSynthesis.speak(utterance);
+          }
+        }
+      }
+
+      return changed ? newRecs : prev;
+    });
+  }, [draws, settings.bettingRounds, settings.predictionLogic, enableVoice, lastClearedPeriod]);
 
   const handleDownload = () => {
     if (recommendations.length === 0) return;
@@ -2898,17 +2924,17 @@ F7::
                   <div className="flex items-center gap-4 mb-4">
                     <span className="text-xs font-mono">预测逻辑:</span>
                     <div className="flex bg-gray-100 p-1 rounded-lg">
-                      {['logic1', 'logic2'].map((l) => (
+                      {['logic1', 'logic2', 'logic3'].map((l) => (
                         <button
                           key={l}
-                          onClick={() => setSettings(s => ({ ...s, predictionLogic: l as 'logic1' | 'logic2' }))}
+                          onClick={() => setSettings(s => ({ ...s, predictionLogic: l as 'logic1' | 'logic2' | 'logic3' }))}
                           className={`px-4 py-1 text-xs font-mono rounded-md transition-all ${
                             settings.predictionLogic === l
                               ? 'bg-[#141414] text-[#E4E3E0] shadow-md'
                               : 'text-gray-500 hover:text-[#141414]'
                           }`}
                         >
-                          {l === 'logic1' ? '逻辑 1' : '逻辑 2'}
+                          {l === 'logic1' ? '逻辑 1' : l === 'logic2' ? '逻辑 2' : '逻辑 3'}
                         </button>
                       ))}
                     </div>
