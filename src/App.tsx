@@ -1713,9 +1713,6 @@ F7::
         let shouldGenerate = false;
         if (patternType) {
           shouldGenerate = true;
-        } else if (settings.predictionLogic === 'logic3' && isContinuing) {
-          shouldGenerate = true;
-          patternType = lastRec.patternType;
         }
 
         if (shouldGenerate) {
@@ -1799,9 +1796,9 @@ F7::
                 recommendedNumbers = [targetNums1[5], targetNums1[6], targetNums1[7], targetNums1[8]];
               }
             } else {
-              const champion = Array.isArray(draws[0].result) 
+              const champion = lastRec?.actualChampion ?? (Array.isArray(draws[0].result) 
                 ? draws[0].result[0] 
-                : parseInt(String(draws[0].result).split(/[,\s]+/)[0]);
+                : parseInt(String(draws[0].result).split(/[,\s]+/)[0]));
               
               const calcNum = (num: number) => {
                 let res = num % 10;
