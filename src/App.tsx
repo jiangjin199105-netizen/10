@@ -1402,6 +1402,38 @@ F7::
 }
 `;
 
+  const handleDownload = (recsToDownload: Recommendation[] = recommendations) => {
+    if (recsToDownload.length === 0) return;
+    
+    // CSV Header
+    const headers = ['预测期号', '推荐号码', '倍投策略', '本轮盈亏', '状态', '实际冠军', '创建时间'];
+    
+    // CSV Rows
+    const rows = recsToDownload.map(rec => [
+      rec.period,
+      rec.recommendedNumbers.join(' '),
+      `第${rec.bettingStep}轮`,
+      rec.profit !== undefined ? rec.profit : '-',
+      rec.status === 'won' ? '中奖' : rec.status === 'lost' ? '未中' : '等待开奖',
+      rec.actualChampion || '-',
+      format(rec.createTime, 'yyyy-MM-dd HH:mm:ss')
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+    
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `lottery_recommendations_${format(new Date(), 'yyyyMMddHHmmss')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleDownloadAhkScript = () => {
     const blob = new Blob([autoAhkScriptContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -1428,6 +1460,25 @@ F7::
 
   // Save recommendations to localStorage whenever they change
   useEffect(() => {
+    // Auto-download and archive when reaching 400 records
+    if (recommendations.length >= 400) {
+      // Trigger download with current records
+      handleDownload(recommendations);
+      
+      // Keep the latest 20 records to maintain UI context and any pending bets
+      // Use setTimeout to ensure the state update happens after the download is initiated
+      setTimeout(() => {
+        setRecommendations(prev => prev.slice(0, 20));
+      }, 500);
+      return; // The state update will trigger this effect again
+    }
+
+    // Limit recommendations to the latest 500 to prevent memory leaks (fallback)
+    if (recommendations.length > 500) {
+      setRecommendations(prev => prev.slice(0, 500));
+      return;
+    }
+    
     localStorage.setItem('lottery_recommendations', JSON.stringify(recommendations));
     
     // Always ensure the backend has the latest pending recommendation
@@ -1543,7 +1594,9 @@ F7::
       const data = await response.json();
       console.log("API response data:", data);
       if (data.draws && data.draws.length > 0) {
-        setDraws(data.draws);
+        // Limit draws to the latest 500 to prevent memory leaks
+        const limitedDraws = data.draws.slice(0, 500);
+        setDraws(limitedDraws);
         setLastUpdated(new Date());
         setNextPeriod(data.nextPeriod || null);
         
@@ -1855,38 +1908,6 @@ F7::
       return changed ? newRecs : prev;
     });
   }, [draws, settings.bettingRounds, settings.predictionLogic, enableVoice, lastClearedPeriod]);
-
-  const handleDownload = () => {
-    if (recommendations.length === 0) return;
-    
-    // CSV Header
-    const headers = ['预测期号', '推荐号码', '倍投策略', '本轮盈亏', '状态', '实际冠军', '创建时间'];
-    
-    // CSV Rows
-    const rows = recommendations.map(rec => [
-      rec.period,
-      rec.recommendedNumbers.join(' '),
-      `第${rec.bettingStep}轮`,
-      rec.profit !== undefined ? rec.profit : '-',
-      rec.status === 'won' ? '中奖' : rec.status === 'lost' ? '未中' : '等待开奖',
-      rec.actualChampion || '-',
-      format(rec.createTime, 'yyyy-MM-dd HH:mm:ss')
-    ]);
-    
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
-    
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `lottery_recommendations_${format(new Date(), 'yyyyMMddHHmmss')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   const totalProfit = recommendations.reduce((sum, rec) => sum + (rec.profit || 0), 0);
 
