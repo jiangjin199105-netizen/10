@@ -29,7 +29,8 @@ import {
   RotateCcw,
   Search,
   Users,
-  Activity
+  Activity,
+  Scissors
 } from 'lucide-react';
 import { format, differenceInSeconds } from 'date-fns';
 import { DrawRecord, Recommendation, AppSettings } from './types';
@@ -1402,7 +1403,8 @@ F7::
 }
 `;
 
-  const handleDownload = (recsToDownload: Recommendation[] = recommendations) => {
+  const handleDownload = (customRecs?: Recommendation[] | any) => {
+    const recsToDownload = Array.isArray(customRecs) ? customRecs : recommendations;
     if (recsToDownload.length === 0) return;
     
     // CSV Header
@@ -1434,6 +1436,23 @@ F7::
     document.body.removeChild(link);
   };
 
+  const handleTruncateRecords = () => {
+    if (recommendations.length <= 20) return;
+    const slicedRecs = recommendations.slice(0, 20);
+    setRecommendations(slicedRecs);
+    localStorage.setItem('lottery_recommendations', JSON.stringify(slicedRecs));
+  };
+
+  // 8-hour soft restart to ensure absolute stability
+  useEffect(() => {
+    const EIGHT_HOURS = 8 * 60 * 60 * 1000;
+    const restartTimer = setTimeout(() => {
+      window.location.reload();
+    }, EIGHT_HOURS);
+    
+    return () => clearTimeout(restartTimer);
+  }, []);
+
   const handleDownloadAhkScript = () => {
     const blob = new Blob([autoAhkScriptContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -1460,19 +1479,6 @@ F7::
 
   // Save recommendations to localStorage whenever they change
   useEffect(() => {
-    // Auto-download and archive when reaching 400 records
-    if (recommendations.length >= 400) {
-      // Trigger download with current records
-      handleDownload(recommendations);
-      
-      // Keep the latest 20 records to maintain UI context and any pending bets
-      // Use setTimeout to ensure the state update happens after the download is initiated
-      setTimeout(() => {
-        setRecommendations(prev => prev.slice(0, 20));
-      }, 500);
-      return; // The state update will trigger this effect again
-    }
-
     // Limit recommendations to the latest 500 to prevent memory leaks (fallback)
     if (recommendations.length > 500) {
       setRecommendations(prev => prev.slice(0, 500));
@@ -2635,6 +2641,22 @@ F7::
                       >
                         <Download size={14} />
                         下载记录
+                      </button>
+                      <button 
+                        onClick={handleTruncateRecords}
+                        className="flex items-center gap-1 text-xs text-orange-600 hover:bg-orange-50 px-2 py-1 rounded transition-colors"
+                        title="仅保留最新的20条记录，防止页面卡顿"
+                      >
+                        <Scissors size={14} />
+                        截断保留20条
+                      </button>
+                      <button 
+                        onClick={() => window.location.reload()}
+                        className="flex items-center gap-1 text-xs text-purple-600 hover:bg-purple-50 px-2 py-1 rounded transition-colors"
+                        title="立即刷新网页，释放浏览器内存"
+                      >
+                        <RotateCcw size={14} />
+                        软启动
                       </button>
                       <button 
                         onClick={handleClearRecommendations}
