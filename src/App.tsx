@@ -117,6 +117,10 @@ const saveLocalUsers = (users: User[]) => {
   localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
 };
 
+// Keep references to utterances to prevent premature garbage collection
+// and to allow cancelling them to prevent memory leaks.
+const globalUtterances: SpeechSynthesisUtterance[] = [];
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = sessionStorage.getItem('current_user');
@@ -1443,14 +1447,27 @@ F7::
     localStorage.setItem('lottery_recommendations', JSON.stringify(slicedRecs));
   };
 
-  // 8-hour soft restart to ensure absolute stability
+  // 8-hour soft restart to ensure absolute stability and cleanup
   useEffect(() => {
     const EIGHT_HOURS = 8 * 60 * 60 * 1000;
     const restartTimer = setTimeout(() => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
       window.location.reload();
     }, EIGHT_HOURS);
     
-    return () => clearTimeout(restartTimer);
+    const handleBeforeUnload = () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      clearTimeout(restartTimer);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, []);
 
   const handleDownloadAhkScript = () => {
@@ -1598,7 +1615,6 @@ F7::
       }
       
       const data = await response.json();
-      console.log("API response data:", data);
       if (data.draws && data.draws.length > 0) {
         // Limit draws to the latest 500 to prevent memory leaks
         const limitedDraws = data.draws.slice(0, 500);
@@ -1911,8 +1927,13 @@ F7::
           
           // Voice notification
           if (enableVoice && 'speechSynthesis' in window) {
+            window.speechSynthesis.cancel(); // Cancel any ongoing speech to prevent memory leaks
             const utterance = new SpeechSynthesisUtterance(`第${nextPeriodStr.slice(-3)}期推荐已生成，倍投策略第${bettingStep}轮`);
             utterance.lang = 'zh-CN';
+            globalUtterances.push(utterance);
+            if (globalUtterances.length > 10) {
+              globalUtterances.shift();
+            }
             window.speechSynthesis.speak(utterance);
           }
         }
