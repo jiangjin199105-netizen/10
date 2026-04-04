@@ -1699,36 +1699,43 @@ F7::
     // and update its status if pending.
 
     setRecommendations(prev => {
-      const newRecs = [...prev];
       let changed = false;
 
-      // Update pending recommendations
-      newRecs.forEach(rec => {
-        if (rec.status === 'pending' && rec.period === latestDraw.period) {
-          const champion = Array.isArray(latestDraw.result) 
-            ? latestDraw.result[0] 
-            : parseInt(String(latestDraw.result).split(/[,\s]+/)[0]);
-          
-          rec.actualChampion = champion;
-          const isWon = rec.recommendedNumbers.includes(champion);
-          rec.status = isWon ? 'won' : 'lost';
-          
-          // Calculate Profit
-          // Step 1: Bet 10/num -> Cost 40. Prize 99.
-          // Step 2: Bet 20/num -> Cost 80. Prize 198.
-          // Step 3: Bet 40/num -> Cost 160. Prize 396.
-          // Step 4: Bet 80/num -> Cost 320. Prize 792.
-          const baseBet = 10 * Math.pow(2, (rec.bettingStep || 1) - 1);
-          const cost = baseBet * rec.recommendedNumbers.length;
-          const prize = isWon ? (baseBet * 9.9) : 0;
-          rec.profit = prize - cost;
+      // Update pending recommendations by checking all available draws
+      let updatedRecs = prev.map(rec => {
+        if (rec.status === 'pending') {
+          const drawForRec = draws.find(d => d.period === rec.period);
+          if (drawForRec) {
+            const champion = Array.isArray(drawForRec.result) 
+              ? drawForRec.result[0] 
+              : parseInt(String(drawForRec.result).split(/[,\s]+/)[0]);
+            
+            const isWon = rec.recommendedNumbers.includes(champion);
+            
+            // Calculate Profit
+            // Step 1: Bet 10/num -> Cost 40. Prize 99.
+            // Step 2: Bet 20/num -> Cost 80. Prize 198.
+            // Step 3: Bet 40/num -> Cost 160. Prize 396.
+            // Step 4: Bet 80/num -> Cost 320. Prize 792.
+            const baseBet = 10 * Math.pow(2, (rec.bettingStep || 1) - 1);
+            const cost = baseBet * rec.recommendedNumbers.length;
+            const prize = isWon ? (baseBet * 9.9) : 0;
+            const profit = prize - cost;
 
-          changed = true;
+            changed = true;
+            return {
+              ...rec,
+              actualChampion: champion,
+              status: isWon ? 'won' : 'lost',
+              profit
+            };
+          }
         }
+        return rec;
       });
 
       // Check if we need to generate a NEW recommendation for nextPeriodStr
-      const exists = newRecs.some(r => r.period === nextPeriodStr);
+      const exists = updatedRecs.some(r => r.period === nextPeriodStr);
       if (draws.length >= 5 && !exists && nextPeriodStr !== lastClearedPeriod) {
         // Perform Analysis
         // Logic (Reduced Offset for 5-period support):
@@ -1766,7 +1773,7 @@ F7::
           patternType = 'Right-Left';
         }
 
-        const lastRec = newRecs.find(r => r.status !== 'pending');
+        const lastRec = updatedRecs.find(r => r.status !== 'pending');
         const isContinuing = lastRec && lastRec.status === 'lost' && lastRec.bettingStep < settings.bettingRounds;
 
         let shouldGenerate = false;
@@ -1828,7 +1835,7 @@ F7::
               recommendedNumbers = [targetNums1[1], targetNums1[2], targetNums1[3], targetNums1[4]];
             }
           } else if (settings.predictionLogic === 'logic3') {
-            if (newRecs.length === 0) {
+            if (updatedRecs.length === 0) {
               const champion = Array.isArray(draws[0].result) 
                 ? draws[0].result[0] 
                 : parseInt(String(draws[0].result).split(/[,\s]+/)[0]);
@@ -1891,7 +1898,7 @@ F7::
             }
           }
 
-          newRecs.unshift({
+          updatedRecs.unshift({
             period: nextPeriodStr,
             basedOnPeriod: latestDraw.period,
             recommendedNumbers,
@@ -1911,7 +1918,7 @@ F7::
         }
       }
 
-      return changed ? newRecs : prev;
+      return changed ? updatedRecs : prev;
     });
   }, [draws, settings.bettingRounds, settings.predictionLogic, enableVoice, lastClearedPeriod]);
 
