@@ -1850,7 +1850,7 @@ F7::
             } else if (index >= 5 && index <= 8) { // Situation D: Right half (not 10th)
               recommendedNumbers = [targetNums1[1], targetNums1[2], targetNums1[3], targetNums1[4]];
             }
-          } else if (settings.predictionLogic === 'logic3') {
+          } else if (settings.predictionLogic === 'logic3' || settings.predictionLogic === 'logic4') {
             if (updatedRecs.length === 0) {
               const champion = Array.isArray(draws[0].result) 
                 ? draws[0].result[0] 
@@ -1888,12 +1888,23 @@ F7::
                 return res;
               };
 
-              const nums = [
-                calcNum(champion),
-                calcNum(champion + 4),
-                calcNum(champion + 6),
-                calcNum(champion + 8)
-              ];
+              let nums: number[];
+              if (settings.predictionLogic === 'logic4') {
+                nums = [
+                  calcNum(champion),
+                  calcNum(champion + 2),
+                  calcNum(champion + 4),
+                  calcNum(champion + 6)
+                ];
+              } else {
+                // logic3
+                nums = [
+                  calcNum(champion),
+                  calcNum(champion + 4),
+                  calcNum(champion + 6),
+                  calcNum(champion + 8)
+                ];
+              }
               recommendedNumbers = Array.from(new Set(nums)).sort((a, b) => a - b);
             }
           }
@@ -2992,17 +3003,17 @@ F7::
                   <div className="flex items-center gap-4 mb-4">
                     <span className="text-xs font-mono">预测逻辑:</span>
                     <div className="flex bg-gray-100 p-1 rounded-lg">
-                      {['logic1', 'logic2', 'logic3'].map((l) => (
+                      {['logic1', 'logic2', 'logic3', 'logic4'].map((l) => (
                         <button
                           key={l}
-                          onClick={() => setSettings(s => ({ ...s, predictionLogic: l as 'logic1' | 'logic2' | 'logic3' }))}
+                          onClick={() => setSettings(s => ({ ...s, predictionLogic: l as 'logic1' | 'logic2' | 'logic3' | 'logic4' }))}
                           className={`px-4 py-1 text-xs font-mono rounded-md transition-all ${
                             settings.predictionLogic === l
                               ? 'bg-[#141414] text-[#E4E3E0] shadow-md'
                               : 'text-gray-500 hover:text-[#141414]'
                           }`}
                         >
-                          {l === 'logic1' ? '逻辑 1' : l === 'logic2' ? '逻辑 2' : '逻辑 3'}
+                          {l === 'logic1' ? '逻辑 1' : l === 'logic2' ? '逻辑 2' : l === 'logic3' ? '逻辑 3' : '逻辑 4'}
                         </button>
                       ))}
                     </div>
