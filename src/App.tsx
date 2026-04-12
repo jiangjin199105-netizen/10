@@ -197,7 +197,18 @@ export default function App() {
   // App Settings
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('app_settings');
-    const defaults: AppSettings = { macroHelper: false, autoRefreshInterval: 15, bettingRounds: 6, predictionLogic: 'logic1' };
+    const defaults: AppSettings = { 
+      macroHelper: false, 
+      autoRefreshInterval: 15, 
+      bettingRounds: 6, 
+      predictionLogic: 'logic1',
+      logicOffsets: {
+        logic3: [0, 4, 6, 8],
+        logic4: [0, 2, 4, 6],
+        logic5: [1, 3, 5, 7],
+        logic6: [-1, 1, 3, 5]
+      }
+    };
     const savedSettings = saved ? JSON.parse(saved) : {};
     return { ...defaults, ...savedSettings };
   });
@@ -1850,7 +1861,7 @@ F7::
             } else if (index >= 5 && index <= 8) { // Situation D: Right half (not 10th)
               recommendedNumbers = [targetNums1[1], targetNums1[2], targetNums1[3], targetNums1[4]];
             }
-          } else if (settings.predictionLogic === 'logic3' || settings.predictionLogic === 'logic4' || settings.predictionLogic === 'logic5') {
+          } else if (['logic3', 'logic4', 'logic5', 'logic6'].includes(settings.predictionLogic)) {
             if (updatedRecs.length === 0) {
               const champion = Array.isArray(draws[0].result) 
                 ? draws[0].result[0] 
@@ -1888,30 +1899,18 @@ F7::
                 return res;
               };
 
-              let nums: number[];
-              if (settings.predictionLogic === 'logic5') {
-                nums = [
-                  calcNum(champion + 1),
-                  calcNum(champion + 3),
-                  calcNum(champion + 5),
-                  calcNum(champion + 7)
-                ];
-              } else if (settings.predictionLogic === 'logic4') {
-                nums = [
-                  calcNum(champion),
-                  calcNum(champion + 2),
-                  calcNum(champion + 4),
-                  calcNum(champion + 6)
-                ];
-              } else {
-                // logic3
-                nums = [
-                  calcNum(champion),
-                  calcNum(champion + 4),
-                  calcNum(champion + 6),
-                  calcNum(champion + 8)
-                ];
-              }
+              // Use offsets from settings if available, otherwise fallback to defaults
+              const logicKey = settings.predictionLogic;
+              const defaultOffsets: Record<string, number[]> = {
+                logic3: [0, 4, 6, 8],
+                logic4: [0, 2, 4, 6],
+                logic5: [1, 3, 5, 7],
+                logic6: [-1, 1, 3, 5]
+              };
+              
+              const offsets = settings.logicOffsets?.[logicKey] || defaultOffsets[logicKey] || [0, 4, 6, 8];
+              
+              const nums = offsets.map(offset => calcNum(champion + offset));
               recommendedNumbers = Array.from(new Set(nums)).sort((a, b) => a - b);
             }
           }
@@ -3007,23 +3006,67 @@ F7::
                 {/* Betting Strategy Settings */}
                 <div className="pt-4 border-t border-[#141414]/10">
                   <h3 className="font-serif font-bold italic text-base mb-3">推荐逻辑设置</h3>
-                  <div className="flex items-center gap-4 mb-4">
-                    <span className="text-xs font-mono">预测逻辑:</span>
-                    <div className="flex bg-gray-100 p-1 rounded-lg">
-                      {['logic1', 'logic2', 'logic3', 'logic4', 'logic5'].map((l) => (
-                        <button
-                          key={l}
-                          onClick={() => setSettings(s => ({ ...s, predictionLogic: l as 'logic1' | 'logic2' | 'logic3' | 'logic4' | 'logic5' }))}
-                          className={`px-4 py-1 text-xs font-mono rounded-md transition-all ${
-                            settings.predictionLogic === l
-                              ? 'bg-[#141414] text-[#E4E3E0] shadow-md'
-                              : 'text-gray-500 hover:text-[#141414]'
-                          }`}
-                        >
-                          {l === 'logic1' ? '逻辑 1' : l === 'logic2' ? '逻辑 2' : l === 'logic3' ? '逻辑 3' : l === 'logic4' ? '逻辑 4' : '逻辑 5'}
-                        </button>
-                      ))}
+                  <div className="flex flex-col gap-4 mb-4">
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs font-mono">预测逻辑:</span>
+                      <div className="flex flex-wrap bg-gray-100 p-1 rounded-lg gap-1">
+                        {['logic1', 'logic2', 'logic3', 'logic4', 'logic5', 'logic6'].map((l) => (
+                          <button
+                            key={l}
+                            onClick={() => setSettings(s => ({ ...s, predictionLogic: l as 'logic1' | 'logic2' | 'logic3' | 'logic4' | 'logic5' | 'logic6' }))}
+                            className={`px-3 py-1 text-xs font-mono rounded-md transition-all ${
+                              settings.predictionLogic === l
+                                ? 'bg-[#141414] text-[#E4E3E0] shadow-md'
+                                : 'text-gray-500 hover:text-[#141414]'
+                            }`}
+                          >
+                            {l === 'logic1' ? '逻辑 1' : l === 'logic2' ? '逻辑 2' : l === 'logic3' ? '逻辑 3' : l === 'logic4' ? '逻辑 4' : l === 'logic5' ? '逻辑 5' : '逻辑 6'}
+                          </button>
+                        ))}
+                      </div>
                     </div>
+                    
+                    {['logic3', 'logic4', 'logic5', 'logic6'].includes(settings.predictionLogic) && (
+                      <div className="flex items-center gap-2 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        <span className="text-xs font-mono text-gray-600">当前逻辑推荐号 (基于上期冠军 n):</span>
+                        <div className="flex items-center gap-2">
+                          {(settings.logicOffsets?.[settings.predictionLogic] || 
+                            (settings.predictionLogic === 'logic3' ? [0, 4, 6, 8] : 
+                             settings.predictionLogic === 'logic4' ? [0, 2, 4, 6] : 
+                             settings.predictionLogic === 'logic5' ? [1, 3, 5, 7] : [-1, 1, 3, 5])).map((offset, idx) => (
+                            <div key={idx} className="flex items-center gap-1">
+                              <span className="text-xs font-mono">n{offset >= 0 ? '+' : ''}</span>
+                              <input
+                                type="number"
+                                value={offset}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value);
+                                  if (isNaN(val)) return;
+                                  
+                                  const currentLogic = settings.predictionLogic;
+                                  const currentOffsets = settings.logicOffsets?.[currentLogic] || 
+                                    (currentLogic === 'logic3' ? [0, 4, 6, 8] : 
+                                     currentLogic === 'logic4' ? [0, 2, 4, 6] : 
+                                     currentLogic === 'logic5' ? [1, 3, 5, 7] : [-1, 1, 3, 5]);
+                                     
+                                  const newOffsets = [...currentOffsets];
+                                  newOffsets[idx] = val;
+                                  
+                                  setSettings(s => ({
+                                    ...s,
+                                    logicOffsets: {
+                                      ...(s.logicOffsets || {}),
+                                      [currentLogic]: newOffsets
+                                    }
+                                  }));
+                                }}
+                                className="w-12 px-1 py-1 text-xs font-mono border border-gray-300 rounded text-center focus:outline-none focus:border-[#141414]"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <h3 className="font-serif font-bold italic text-base mb-3">倍投策略设置</h3>
