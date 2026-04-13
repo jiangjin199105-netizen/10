@@ -1915,21 +1915,21 @@ F7::
             }
           } else if (settings.predictionLogic === 'logic7' || settings.predictionLogic === 'logic8') {
             if (draws.length >= 5) {
-              const champion = Array.isArray(draws[0].result) 
+              const champion = parseInt(String(Array.isArray(draws[0].result) 
                 ? draws[0].result[0] 
-                : parseInt(String(draws[0].result).split(/[,\s]+/)[0]);
+                : String(draws[0].result).split(/[,\s]+/)[0]).trim());
               
               const targetDraw4 = draws[3]; // 往下的第4条开奖记录 (index 3)
-              const targetNums4 = Array.isArray(targetDraw4.result)
+              const targetNums4 = (Array.isArray(targetDraw4.result)
                 ? targetDraw4.result
-                : String(targetDraw4.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
+                : String(targetDraw4.result).split(/[,\s]+/)).map(n => parseInt(String(n).trim()));
               
               const index = targetNums4.indexOf(champion);
 
               const targetDraw3 = draws[2]; // 往下的第3条开奖记录 (index 2)
-              const targetNums3 = Array.isArray(targetDraw3.result)
+              const targetNums3 = (Array.isArray(targetDraw3.result)
                 ? targetDraw3.result
-                : String(targetDraw3.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
+                : String(targetDraw3.result).split(/[,\s]+/)).map(n => parseInt(String(n).trim()));
 
               if (settings.predictionLogic === 'logic7') {
                 if (index >= 0 && index <= 4) { // 左半区
