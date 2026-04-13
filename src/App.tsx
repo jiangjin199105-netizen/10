@@ -1913,6 +1913,38 @@ F7::
               const nums = offsets.map(offset => calcNum(champion + offset));
               recommendedNumbers = Array.from(new Set(nums)).sort((a, b) => a - b);
             }
+          } else if (settings.predictionLogic === 'logic7' || settings.predictionLogic === 'logic8') {
+            if (draws.length >= 5) {
+              const champion = Array.isArray(draws[0].result) 
+                ? draws[0].result[0] 
+                : parseInt(String(draws[0].result).split(/[,\s]+/)[0]);
+              
+              const targetDraw4 = draws[3]; // 往下的第4条开奖记录 (index 3)
+              const targetNums4 = Array.isArray(targetDraw4.result)
+                ? targetDraw4.result
+                : String(targetDraw4.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
+              
+              const index = targetNums4.indexOf(champion);
+
+              const targetDraw3 = draws[2]; // 往下的第3条开奖记录 (index 2)
+              const targetNums3 = Array.isArray(targetDraw3.result)
+                ? targetDraw3.result
+                : String(targetDraw3.result).split(/[,\s]+/).map(n => parseInt(n.trim()));
+
+              if (settings.predictionLogic === 'logic7') {
+                if (index >= 0 && index <= 4) { // 左半区
+                  recommendedNumbers = [targetNums3[0], targetNums3[1], targetNums3[2], targetNums3[3]]; // 1 2 3 4 位置
+                } else if (index >= 5 && index <= 9) { // 右半区
+                  recommendedNumbers = [targetNums3[6], targetNums3[7], targetNums3[8], targetNums3[9]]; // 7 8 9 10 位置
+                }
+              } else if (settings.predictionLogic === 'logic8') {
+                if (index >= 0 && index <= 4) { // 左半区
+                  recommendedNumbers = [targetNums3[6], targetNums3[7], targetNums3[8], targetNums3[9]]; // 7 8 9 10 位置
+                } else if (index >= 5 && index <= 9) { // 右半区
+                  recommendedNumbers = [targetNums3[0], targetNums3[1], targetNums3[2], targetNums3[3]]; // 1 2 3 4 位置
+                }
+              }
+            }
           }
         }
 
@@ -3008,22 +3040,49 @@ F7::
                   <h3 className="font-serif font-bold italic text-base mb-3">推荐逻辑设置</h3>
                   <div className="flex flex-col gap-4 mb-4">
                     <div className="flex items-center gap-4">
-                      <span className="text-xs font-mono">预测逻辑:</span>
+                      <span className="text-xs font-mono whitespace-nowrap">预测逻辑:</span>
                       <div className="flex flex-wrap bg-gray-100 p-1 rounded-lg gap-1">
-                        {['logic1', 'logic2', 'logic3', 'logic4', 'logic5', 'logic6'].map((l) => (
+                        {['logic1', 'logic2', 'logic3', 'logic4', 'logic5', 'logic6', 'logic7', 'logic8'].map((l) => (
                           <button
                             key={l}
-                            onClick={() => setSettings(s => ({ ...s, predictionLogic: l as 'logic1' | 'logic2' | 'logic3' | 'logic4' | 'logic5' | 'logic6' }))}
+                            onClick={() => setSettings(s => ({ ...s, predictionLogic: l as 'logic1' | 'logic2' | 'logic3' | 'logic4' | 'logic5' | 'logic6' | 'logic7' | 'logic8' }))}
                             className={`px-3 py-1 text-xs font-mono rounded-md transition-all ${
                               settings.predictionLogic === l
                                 ? 'bg-[#141414] text-[#E4E3E0] shadow-md'
                                 : 'text-gray-500 hover:text-[#141414]'
                             }`}
                           >
-                            {l === 'logic1' ? '逻辑 1' : l === 'logic2' ? '逻辑 2' : l === 'logic3' ? '逻辑 3' : l === 'logic4' ? '逻辑 4' : l === 'logic5' ? '逻辑 5' : '逻辑 6'}
+                            {l === 'logic1' ? '逻辑 1' : l === 'logic2' ? '逻辑 2' : l === 'logic3' ? '逻辑 3' : l === 'logic4' ? '逻辑 4' : l === 'logic5' ? '逻辑 5' : l === 'logic6' ? '逻辑 6' : l === 'logic7' ? '逻辑 7' : '逻辑 8'}
                           </button>
                         ))}
                       </div>
+                    </div>
+                    
+                    <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-lg text-xs font-sans text-blue-800 leading-relaxed">
+                      {settings.predictionLogic === 'logic1' && (
+                        <p><strong>逻辑 1：</strong>寻找最新一期冠军在上一期中的位置。若在左半区(1-5名)，推荐上一期的第6,7,8,10名；若在右半区(6-10名)，推荐上一期的第1,3,4,5名。</p>
+                      )}
+                      {settings.predictionLogic === 'logic2' && (
+                        <p><strong>逻辑 2：</strong>寻找最新一期冠军在上一期中的位置。若在第1名，推荐上一期6,7,8,10名；若在第10名，推荐上一期1,3,4,5名；若在2-5名，推荐上一期6,7,8,9名；若在6-9名，推荐上一期2,3,4,5名。</p>
+                      )}
+                      {settings.predictionLogic === 'logic3' && (
+                        <p><strong>逻辑 3：</strong>首期寻找最新冠军在上上期(第3条记录)中的位置，若为第1名推荐上一期1,3,4,5名；第10名推荐6,7,8,10名；2-5名推荐2,3,4,5名；6-9名推荐6,7,8,9名。后续倍投推荐 n, n+4, n+6, n+8（可自定义偏移量）。</p>
+                      )}
+                      {settings.predictionLogic === 'logic4' && (
+                        <p><strong>逻辑 4：</strong>首期判定同逻辑3。后续倍投推荐 n, n+2, n+4, n+6（可自定义偏移量）。</p>
+                      )}
+                      {settings.predictionLogic === 'logic5' && (
+                        <p><strong>逻辑 5：</strong>首期判定同逻辑3。后续倍投推荐 n+1, n+3, n+5, n+7（可自定义偏移量）。</p>
+                      )}
+                      {settings.predictionLogic === 'logic6' && (
+                        <p><strong>逻辑 6：</strong>首期判定同逻辑3。后续倍投推荐 n-1, n+1, n+3, n+5（可自定义偏移量）。</p>
+                      )}
+                      {settings.predictionLogic === 'logic7' && (
+                        <p><strong>逻辑 7：</strong>至少需要5条记录。寻找最新一期冠军在往下的第4条记录中的位置。如果在左半区(1-5名)，则推荐往下的第3条记录的第1,2,3,4名；如果在右半区(6-10名)，则推荐往下的第3条记录的第7,8,9,10名。每次预测都使用此规则，不使用偏移量。</p>
+                      )}
+                      {settings.predictionLogic === 'logic8' && (
+                        <p><strong>逻辑 8：</strong>至少需要5条记录。寻找最新一期冠军在往下的第4条记录中的位置。如果在左半区(1-5名)，则推荐往下的第3条记录的第7,8,9,10名；如果在右半区(6-10名)，则推荐往下的第3条记录的第1,2,3,4名。每次预测都使用此规则，不使用偏移量。</p>
+                      )}
                     </div>
                     
                     {['logic3', 'logic4', 'logic5', 'logic6'].includes(settings.predictionLogic) && (
