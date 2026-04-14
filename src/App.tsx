@@ -201,6 +201,7 @@ export default function App() {
       macroHelper: false, 
       autoRefreshInterval: 15, 
       bettingRounds: 6, 
+      betSteps: [10, 20, 40, 80, 160, 320],
       predictionLogic: 'logic1',
       logicOffsets: {
         logic3: [0, 4, 6, 8],
@@ -659,9 +660,9 @@ Coords["Key0"] := [944, 842, 1], Coords["Key1"] := [785, 626, 1], Coords["Key2"]
 Coords["Key4"] := [799, 700, 1], Coords["Key5"] := [951, 695, 1], Coords["Key6"] := [1086, 695, 1], Coords["Key7"] := [781, 769, 1]
 Coords["Key8"] := [932, 773, 1], Coords["Key9"] := [1073, 767, 1], Coords["KeyReturn"] := [1215, 900, 1]
 
-; 倍投策略 (12轮)
-global BetSteps := [10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480]
-global MaxRounds := 6
+; 倍投策略
+global BetSteps := [${(settings.betSteps || []).join(', ')}]
+global MaxRounds := ${settings.bettingRounds}
 
 ; ==============================================================================
 ; 全局变量 (Global Variables)
@@ -700,30 +701,58 @@ MyGui.Add("Text", "x10 y190 w380", "运行日志:")
 global LogEdit := MyGui.Add("Edit", "x10 y210 w430 h220 ReadOnly vLogOutput")
 
 MyGui.Add("Text", "x10 y445 w80", "倍投轮数:")
-MyGui.Add("Radio", "x90 y442 w60 vRounds4", "4 轮").OnEvent("Click", (*) => ChangeRounds(4))
-MyGui.Add("Radio", "x160 y442 w60 vRounds6 Checked", "6 轮").OnEvent("Click", (*) => ChangeRounds(6))
-MyGui.Add("Radio", "x230 y442 w60 vRounds9", "9 轮").OnEvent("Click", (*) => ChangeRounds(9))
-MyGui.Add("Radio", "x300 y442 w60 vRounds12", "12 轮").OnEvent("Click", (*) => ChangeRounds(12))
+global EditRounds := MyGui.Add("Edit", "x90 y442 w60 vMaxRounds", MaxRounds)
+EditRounds.OnEvent("Change", UpdateRoundsUI)
 
-MyGui.Add("GroupBox", "x10 y470 w430 h100", "倍投金额配置")
+MyGui.Add("GroupBox", "x10 y470 w430 h150", "倍投金额配置")
 global EditSteps := []
-Loop 12 {
+Loop 50 {
     col := Mod(A_Index - 1, 6)
     row := (A_Index - 1) // 6
-    EditSteps.Push(MyGui.Add("Edit", "x" (20 + col*70) " y" (495 + row*30) " w60 vStep" A_Index, BetSteps[A_Index]))
-}
-MyGui.Add("Button", "x10 y580 w430 h30 vBtnSave", "保存金额配置").OnEvent("Click", SaveBetSteps)
-
-ChangeRounds(n) {
-    global MaxRounds := n
-    Loop 12 {
-        MyGui["Step" A_Index].Enabled := (A_Index <= n)
+    editCtrl := MyGui.Add("Edit", "x" (20 + col*70) " y" (495 + row*30) " w60 vStep" A_Index, A_Index <= BetSteps.Length ? BetSteps[A_Index] : 10)
+    if (A_Index > MaxRounds) {
+        editCtrl.Visible := false
     }
-    AddLog("倍投轮数已切换为: " n " 轮")
+    EditSteps.Push(editCtrl)
+}
+MyGui.Add("Button", "x10 y630 w430 h30 vBtnSave", "保存金额配置").OnEvent("Click", SaveBetSteps)
+
+UpdateRoundsUI(*) {
+    global MaxRounds
+    try {
+        val := Integer(EditRounds.Value)
+        if (val > 0 && val <= 50) {
+            MaxRounds := val
+            Loop 50 {
+                EditSteps[A_Index].Visible := (A_Index <= MaxRounds)
+            }
+        }
+    }
+}
+
+SaveBetSteps(*) {
+    global BetSteps, MaxRounds
+    try {
+        val := Integer(EditRounds.Value)
+        if (val > 0 && val <= 50) {
+            MaxRounds := val
+        }
+    }
+    newSteps := []
+    Loop MaxRounds {
+        val := EditSteps[A_Index].Value
+        if (IsInteger(val)) {
+            newSteps.Push(Integer(val))
+        } else {
+            newSteps.Push(10)
+        }
+    }
+    BetSteps := newSteps
+    AddLog("已保存倍投配置: " MaxRounds " 轮")
 }
 
 MyGui.OnEvent("Close", (*) => ExitApp())
-MyGui.Show("w450 h630")
+MyGui.Show("w450 h680")
 
 ; ==============================================================================
 ; 坐标配置窗口 (Coordinate Configuration GUI)
@@ -1050,18 +1079,6 @@ CaptureWindow(*)
     }
 }
 
-SaveBetSteps(*)
-{
-    global BetSteps
-    Loop 12 {
-        val := MyGui["Step" A_Index].Value
-        if IsNumber(val)
-            BetSteps[A_Index] := Number(val)
-    }
-    AddLog("倍投金额配置已保存")
-    MsgBox "倍投金额配置已保存！", "成功", "Iconi"
-}
-
 StartScript(*)
 {
     global IsRunning, TargetHwnd, BetSteps
@@ -1071,11 +1088,7 @@ StartScript(*)
     }
     
     ; 同步 GUI 中的倍投金额
-    Loop 12 {
-        val := MyGui["Step" A_Index].Value
-        if IsNumber(val)
-            BetSteps[A_Index] := Number(val)
-    }
+    SaveBetSteps()
     
     IsRunning := true
     MyGui["BtnStart"].Enabled := false
@@ -3130,26 +3143,55 @@ F7::
                   </div>
 
                   <h3 className="font-serif font-bold italic text-base mb-3">倍投策略设置</h3>
-                  <div className="flex items-center gap-4">
-                    <span className="text-xs font-mono">倍投轮数:</span>
-                    <div className="flex bg-gray-100 p-1 rounded-lg">
-                      {[4, 6, 9, 12].map((rounds) => (
-                        <button
-                          key={rounds}
-                          onClick={() => setSettings(s => ({ ...s, bettingRounds: rounds as 4 | 6 | 9 | 12 }))}
-                          className={`px-4 py-1 text-xs font-mono rounded-md transition-all ${
-                            settings.bettingRounds === rounds
-                              ? 'bg-[#141414] text-[#E4E3E0] shadow-md'
-                              : 'text-gray-500 hover:text-[#141414]'
-                          }`}
-                        >
-                          {rounds} 轮
-                        </button>
-                      ))}
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs font-mono">倍投轮数:</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="50"
+                        value={settings.bettingRounds}
+                        onChange={(e) => {
+                          const rounds = Math.max(1, parseInt(e.target.value) || 1);
+                          setSettings(s => {
+                            const newSteps = [...(s.betSteps || [])];
+                            while (newSteps.length < rounds) {
+                              newSteps.push(newSteps.length > 0 ? newSteps[newSteps.length - 1] * 2 : 10);
+                            }
+                            return { ...s, bettingRounds: rounds, betSteps: newSteps.slice(0, rounds) };
+                          });
+                        }}
+                        className="w-20 px-2 py-1 text-xs font-mono border border-gray-300 rounded"
+                      />
+                      <span className="text-[10px] text-gray-400 font-mono">
+                        (自定义倍投轮数)
+                      </span>
                     </div>
-                    <span className="text-[10px] text-gray-400 font-mono">
-                      (当前: {settings.bettingRounds === 4 ? '10-20-40-80' : settings.bettingRounds === 6 ? '10-20-40-80-160-320' : settings.bettingRounds === 9 ? '9轮倍投模式' : '12轮倍投模式'})
-                    </span>
+                    
+                    <div className="flex flex-col gap-2">
+                      <span className="text-xs font-mono">倍投金额配置:</span>
+                      <div className="grid grid-cols-6 gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        {Array.from({ length: settings.bettingRounds }).map((_, idx) => (
+                          <div key={idx} className="flex flex-col gap-1">
+                            <span className="text-[10px] text-gray-500 text-center">第 {idx + 1} 轮</span>
+                            <input
+                              type="number"
+                              min="1"
+                              value={settings.betSteps?.[idx] || ''}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                setSettings(s => {
+                                  const newSteps = [...(s.betSteps || [])];
+                                  newSteps[idx] = val;
+                                  return { ...s, betSteps: newSteps };
+                                });
+                              }}
+                              className="w-full px-2 py-1 text-xs font-mono border border-gray-300 rounded text-center"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
 

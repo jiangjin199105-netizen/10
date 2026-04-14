@@ -21,7 +21,8 @@ export interface AppSettings {
   macroHelper: boolean;
   macroConfig?: MacroConfig;
   autoRefreshInterval: number;
-  bettingRounds: 4 | 6 | 9 | 12;
+  bettingRounds: number;
+  betSteps: number[];
   predictionLogic: 'logic1' | 'logic2' | 'logic3' | 'logic4' | 'logic5' | 'logic6' | 'logic7' | 'logic8';
   logicOffsets?: Record<string, number[]>;
 }
